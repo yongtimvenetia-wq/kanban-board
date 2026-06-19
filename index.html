@@ -1,0 +1,2200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VYT's Zone</title>
+<style>
+  :root {
+    --bg: #f6f7fa;
+    --panel: #ffffff;
+    --text: #1f2733;
+    --muted: #6b7688;
+    --border: #e4e8f0;
+    --shadow: 0 1px 3px rgba(20,30,55,.08), 0 6px 18px rgba(20,30,55,.06);
+    --todo: #6366f1;
+    --progress: #f59e0b;
+    --blocked: #ef4444;
+    --done: #10b981;
+    --accent: #6366f1;
+    --p-low: #64748b;
+    --p-medium: #0ea5e9;
+    --p-high: #f59e0b;
+    --p-urgent: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex; align-items: center; gap: 22px;
+    position: sticky; top: 0; z-index: 20;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 40px; height: 40px; border-radius: 11px; flex: none;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff; font-weight: 800; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand-text h1 { margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -.2px; color: var(--text); }
+  .brand-text p { margin: 1px 0 0; font-size: 12px; color: var(--muted); }
+  nav { display: flex; gap: 4px; }
+  .tab {
+    border: none; background: none; cursor: pointer;
+    padding: 8px 16px; font-size: 14px; font-weight: 600; color: var(--muted);
+    border-radius: 9px;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); background: #eef0fe; }
+  .saved-ind { margin-left: auto; display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+  .saved-ind .dot-green { width: 8px; height: 8px; border-radius: 50%; background: var(--done); }
+  main { padding: 22px 28px; max-width: 1680px; margin: 0 auto; }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* Epics bar */
+  .epics-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .epics-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-right: 4px; }
+  .epics-count { font-size: 12px; color: var(--muted); }
+  .epic-filter { border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; font-size: 13px; font-family: inherit; min-width: 180px; background: #fff; }
+  .epic-filter:focus { outline: 2px solid rgba(99,102,241,.3); border-color: var(--accent); }
+  .epics-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .epics-list.scroll { max-height: 96px; overflow-y: auto; padding: 2px; width: 100%; }
+  .epics-list.scroll::-webkit-scrollbar { width: 8px; }
+  .epics-list.scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+  .epic-pill {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600;
+    padding: 6px 8px 6px 12px; border-radius: 20px; cursor: pointer;
+    background: #eef0f6; color: var(--text); border: 1px solid var(--border);
+  }
+  .epic-pill:hover { border-color: #cfd5e6; }
+  .epic-pill .ep-name { white-space: nowrap; }
+  .epic-pill .ep-track { width: 44px; height: 5px; background: #dde1ec; border-radius: 10px; overflow: hidden; }
+  .epic-pill .ep-fill { display: block; height: 100%; border-radius: 10px; }
+  .epic-pill .pct { color: var(--muted); font-weight: 700; font-size: 11px; }
+  .epic-pill .x { cursor: pointer; opacity: .5; font-size: 14px; line-height: 1; padding: 0 2px; color: var(--muted); }
+  .epic-pill .x:hover { opacity: 1; color: #dc2626; }
+
+  /* Epic detail */
+  .ed-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+  .progress-wrap { margin: 16px 0 8px; }
+  .progress-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .progress-top span:first-child { font-size: 20px; font-weight: 800; }
+  .muted-sm { font-size: 12px; color: var(--muted); }
+  .progress-track { height: 12px; background: var(--bg); border-radius: 20px; overflow: hidden; display: flex; }
+  .progress-fill { height: 100%; background: var(--done); border-radius: 20px; transition: width .4s ease; }
+  .progress-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .progress-legend .lg { display: inline-flex; align-items: center; gap: 5px; }
+  .progress-legend .lg .sw { width: 10px; height: 10px; border-radius: 3px; }
+  .ed-tickets-head { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin: 18px 0 8px; }
+  .ed-tickets { list-style: none; padding: 0; margin: 0; max-height: 280px; overflow-y: auto; }
+  .ed-ticket { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; cursor: pointer; }
+  .ed-ticket:hover { border-color: var(--accent); background: #fafbff; }
+  .ed-ticket .et-id { font-size: 11px; font-weight: 800; color: #0891b2; min-width: 64px; letter-spacing: .3px; }
+  .ed-ticket .et-title { flex: 1; font-size: 14px; }
+  .et-unlink { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 0 4px; border-radius: 6px; }
+  .et-unlink:hover { color: #dc2626; background: #fef2f2; }
+
+  /* Confirm modal */
+  .confirm-modal { max-width: 400px; text-align: center; }
+  .confirm-icon { font-size: 34px; margin-bottom: 6px; }
+  .confirm-modal h3 { font-size: 18px; margin: 0 0 8px; }
+  .confirm-msg { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 0 0 20px; }
+  .confirm-actions { justify-content: center; }
+  .btn.danger-solid { background: #dc2626; color: #fff; }
+  .btn.danger-solid:hover { background: #b91c1c; }
+  .status-tag { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 20px; color: #fff; white-space: nowrap; }
+  .status-tag.todo { background: var(--todo); }
+  .status-tag.progress { background: var(--progress); }
+  .status-tag.blocked { background: var(--blocked); }
+  .status-tag.done { background: var(--done); }
+  .ed-empty { font-size: 13px; color: var(--muted); padding: 8px 0; }
+  .epics-empty { font-size: 13px; color: var(--muted); }
+  .btn-epic-new {
+    border: 1px dashed var(--border); background: var(--panel); color: var(--accent);
+    font-size: 12px; font-weight: 700; border-radius: 20px; padding: 6px 14px; cursor: pointer;
+  }
+  .btn-epic-new:hover { border-color: var(--accent); }
+  .swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+  .swatch { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; }
+  .swatch.sel { border-color: #1f2733; }
+
+  /* Filter bar */
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 18px; }
+  .filter-bar .flt-search {
+    flex: 1; min-width: 240px; border: 1px solid var(--border); border-radius: 14px;
+    padding: 14px 16px 14px 44px; font-size: 15px; font-family: inherit; background: #fff;
+    box-shadow: var(--shadow);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%239aa3b2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>");
+    background-repeat: no-repeat; background-position: 16px center;
+  }
+  .filter-bar select {
+    border: 1px solid var(--border); border-radius: 12px; padding: 13px 38px 13px 16px;
+    font-size: 14px; font-family: inherit; background: #fff; cursor: pointer;
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7688' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat; background-position: right 14px center;
+  }
+  .filter-bar input:focus, .filter-bar select:focus { outline: 2px solid rgba(99,102,241,.3); border-color: var(--accent); }
+  .flt-clear { border: 1px solid var(--border); background: #fff; color: var(--text); border-radius: 12px; padding: 13px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .flt-clear:hover { border-color: var(--accent); color: var(--accent); }
+  .flt-count { font-size: 12px; color: var(--muted); width: 100%; }
+
+  /* Kanban */
+  .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 1000px) { .board { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .board { grid-template-columns: 1fr; } }
+  .column {
+    background: var(--panel); border-radius: 16px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column;
+  }
+  .column[data-col="todo"]     { --col: var(--todo); }
+  .column[data-col="progress"] { --col: var(--progress); }
+  .column[data-col="blocked"]  { --col: var(--blocked); }
+  .column[data-col="done"]     { --col: var(--done); }
+  .col-head {
+    display: flex; align-items: center; gap: 9px;
+    padding: 16px 16px 12px; font-weight: 700; font-size: 15px;
+  }
+  .col-head .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--col); }
+  .count { font-size: 12px; color: var(--muted); background: var(--bg); padding: 2px 9px; border-radius: 20px; font-weight: 600; }
+  .col-add {
+    margin-left: auto; border: none; background: none; color: var(--muted); cursor: pointer;
+    font-size: 22px; line-height: 1; width: 30px; height: 30px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .col-add:hover { background: var(--bg); color: var(--accent); }
+  .empty-col {
+    border: 1.5px dashed var(--border); border-radius: 12px; padding: 26px 12px;
+    text-align: center; color: var(--muted); font-size: 13px; margin: 2px 4px 10px;
+  }
+  .cards {
+    padding: 4px 12px 12px; flex: 1 1 auto; min-height: 60px;
+    /* each column scrolls on its own so the page stays put */
+    max-height: max(240px, calc(100vh - 300px));
+    overflow-y: auto;
+  }
+  .cards::-webkit-scrollbar { width: 8px; }
+  .cards::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+  .cards::-webkit-scrollbar-thumb:hover { background: #cbd2de; }
+  /* on phones, let the page scroll normally instead of tiny inner panes */
+  @media (max-width: 600px) { .cards { max-height: none; overflow-y: visible; } }
+  .card {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: 13px; padding: 14px; margin-bottom: 12px; cursor: grab;
+    box-shadow: 0 1px 2px rgba(20,30,55,.04); font-size: 14px; line-height: 1.4;
+    word-break: break-word; position: relative;
+    transition: box-shadow .15s ease, border-color .15s ease, transform .15s ease;
+  }
+  .card:hover { box-shadow: 0 4px 14px rgba(20,30,55,.10); border-color: #d7dbe6; }
+  .card.dragging { opacity: .45; }
+  .card .id { font-size: 11px; color: var(--accent); font-weight: 700; letter-spacing: .5px; }
+  .card .title { font-weight: 700; margin: 4px 0 10px; font-size: 15px; }
+  .card .del {
+    position: absolute; top: 6px; right: 8px; border: none; background: none;
+    color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; opacity: 0;
+    transform-origin: center; transition: transform .12s ease, color .12s ease;
+  }
+  .card:hover .del { opacity: 1; }
+  .card .del:hover { color: #ef4444; transform: scale(1.5); }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 9px 3px 8px; border-radius: 20px; display: inline-flex; align-items: center; gap: 5px; }
+  .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .badge.low { background: #f1f3f7; color: #64748b; }
+  .badge.medium { background: #eef0fe; color: #6366f1; }
+  .badge.high { background: #fef2f2; color: #ef4444; }
+  .badge.urgent { background: #fef2f2; color: #dc2626; }
+  .chip { font-size: 11px; padding: 3px 8px; border-radius: 7px; background: var(--bg); color: var(--muted); border: 1px solid var(--border); display: inline-flex; align-items: center; gap: 4px; }
+  .chip.epic { background: #f3e8ff; color: #7c3aed; border-color: #e9d5ff; }
+  .chip.label { background: #ecfdf5; color: #047857; border-color: #d1fae5; }
+  .chip.assignee { background: #eef2ff; color: #4338ca; border-color: #e0e7ff; }
+  .chip.due { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+  .chip.overdue { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+  .cards.drop-hint { background: rgba(99,102,241,.06); border-radius: 10px; }
+
+  /* Modal */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(20,28,48,.45); display: none;
+    align-items: flex-start; justify-content: center; z-index: 50; padding: 40px 16px; overflow-y: auto;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: #fff; border-radius: 16px; width: 100%; max-width: 560px; box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    padding: 22px 24px 24px;
+  }
+  .modal h3 { margin: 0 0 2px; font-size: 18px; }
+  .modal .sub { color: #0891b2; font-weight: 700; font-size: 12px; letter-spacing: .3px; margin-bottom: 16px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .4px; }
+  .field input, .field select, .field textarea {
+    width: 100%; border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px;
+    font-size: 14px; font-family: inherit;
+  }
+  .field textarea { resize: vertical; min-height: 70px; }
+  /* rich description field (contenteditable) */
+  .field .rich {
+    width: 100%; border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px;
+    font-size: 14px; font-family: inherit; min-height: 70px; line-height: 1.5;
+    white-space: pre-wrap; overflow-wrap: anywhere; background: #fff;
+  }
+  .field .rich:focus { outline: 2px solid rgba(99,102,241,.3); border-color: var(--accent); }
+  .field .rich:empty:before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
+  .field .rich a { color: var(--accent); text-decoration: underline; cursor: pointer; }
+  /* rendered formatting inside the description */
+  .field .rich h1 { font-size: 20px; font-weight: 800; margin: .45em 0 .3em; line-height: 1.25; }
+  .field .rich h2 { font-size: 17px; font-weight: 700; margin: .45em 0 .3em; line-height: 1.25; }
+  .field .rich h3 { font-size: 15px; font-weight: 700; margin: .45em 0 .3em; line-height: 1.25; }
+  .field .rich p { margin: .3em 0; }
+  .field .rich ul, .field .rich ol { margin: .3em 0; padding-left: 22px; }
+  .field .rich li { margin: .15em 0; }
+  .field .rich blockquote { margin: .4em 0; padding: 3px 12px; border-left: 3px solid var(--border); color: var(--muted); }
+  .field .rich code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; padding: 1px 5px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+  /* formatting toolbar */
+  .rich-toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 2px;
+    border: 1px solid var(--border); border-bottom: none; border-radius: 9px 9px 0 0;
+    background: var(--bg); padding: 5px 6px;
+  }
+  .rich-toolbar + .rich { border-radius: 0 0 9px 9px; }
+  .rt-btn {
+    border: none; background: none; cursor: pointer; min-width: 28px; height: 28px;
+    border-radius: 6px; font-size: 13px; color: var(--text); padding: 0 6px;
+    display: inline-flex; align-items: center; justify-content: center; font-family: inherit;
+  }
+  .rt-btn:hover { background: #fff; }
+  .rt-btn.active { background: #fff; color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .rt-btn .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+  .rt-block { border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; font-size: 12px; font-family: inherit; background: #fff; cursor: pointer; }
+  .rt-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+  .rich-hint { font-size: 11px; color: var(--muted); margin-top: 5px; }
+  .rich-hint kbd { background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px; font-size: 11px; font-family: inherit; }
+  /* ⌘K link popover */
+  .link-pop {
+    position: fixed; z-index: 60; display: none; background: #fff; border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 10px; width: 290px;
+  }
+  .link-pop label { display: block; font-size: 11px; font-weight: 700; color: var(--accent); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .4px; }
+  .link-pop input { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; }
+  .link-pop .lp-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .link-pop .btn { padding: 7px 12px; font-size: 13px; }
+  .link-pop .lp-remove { margin-left: auto; }
+  /* searchable combobox (epic picker) */
+  .combo { position: relative; }
+  .combo-input { width: 100%; border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px; font-size: 14px; font-family: inherit; }
+  .combo-input:focus { outline: 2px solid rgba(99,102,241,.3); border-color: var(--accent); }
+  .combo-menu {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5; display: none;
+    background: #fff; border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 12px 30px rgba(0,0,0,.16); max-height: 240px; overflow-y: auto; padding: 4px;
+  }
+  .combo-menu.open { display: block; }
+  .combo-opt { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 7px; cursor: pointer; font-size: 14px; }
+  .combo-opt.active { background: rgba(99,102,241,.1); }
+  .combo-dot { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+  .combo-txt { flex: 1; }
+  .combo-check { color: var(--accent); font-weight: 700; }
+  .combo-create { color: var(--accent); font-weight: 600; }
+  .combo-none { color: var(--muted); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 480px) { .row2, .row3 { grid-template-columns: 1fr; } }
+  input:focus, select:focus, textarea:focus { outline: 2px solid rgba(99,102,241,.3); border-color: var(--accent); }
+  .error { display: none; color: #dc2626; font-size: 12px; font-weight: 600; margin-top: 6px; }
+  .error.show { display: block; }
+  input.invalid { border-color: #dc2626; }
+  input.invalid:focus { outline-color: rgba(220,38,38,.3); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 8px; align-items: center; }
+  .btn { border: none; border-radius: 9px; padding: 10px 18px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.ghost { background: var(--bg); color: var(--text); }
+  .btn.danger { background: none; color: #ef4444; margin-left: auto; }
+  .m-saved { font-size: 12px; font-weight: 700; color: var(--done); opacity: 0; transition: opacity .3s; }
+  .m-saved.show { opacity: 1; }
+  /* Attachments */
+  .dropzone {
+    border: 2px dashed var(--border); border-radius: 10px; padding: 16px; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 8px; transition: all .15s;
+  }
+  .dropzone.dragover { border-color: var(--accent); background: rgba(99,102,241,.06); }
+  .dropzone .dz-text { font-size: 13px; color: var(--muted); }
+  .btn-attach { border: 1px solid var(--accent); background: #fff; color: var(--accent); border-radius: 9px; padding: 7px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .btn-attach:hover { background: var(--accent); color: #fff; }
+  .link-row { display: flex; gap: 8px; margin-top: 10px; }
+  .link-row input { flex: 1; border: 1px solid var(--border); border-radius: 9px; padding: 8px 11px; font-size: 13px; font-family: inherit; }
+  .attach-list { list-style: none; padding: 0; margin: 10px 0 0; }
+  .attach-item { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; margin-bottom: 8px; }
+  .attach-item img.thumb { width: 38px; height: 38px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
+  .attach-item .ic { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; background: var(--bg); border-radius: 6px; font-size: 18px; }
+  .attach-item .a-name { flex: 1; font-size: 13px; word-break: break-all; }
+  .attach-item .a-name a { color: var(--accent); text-decoration: none; }
+  .attach-item .a-name a:hover { text-decoration: underline; }
+  .attach-item .a-size { font-size: 11px; color: var(--muted); }
+  .attach-item .a-del { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 0 4px; }
+  .attach-item .a-del:hover { color: #dc2626; }
+  .chip.attach { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+  .chip.links { background: #eef2ff; color: #4338ca; border-color: #e0e7ff; }
+
+  /* Linked tickets list */
+  .link-row .linksearch { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 9px; padding: 8px 11px; font-size: 13px; font-family: inherit; }
+  .link-row #f-linksel { flex: 1; min-width: 0; }
+  .link-row #f-link-add { white-space: nowrap; }
+  .linked-list { list-style: none; padding: 0; margin: 10px 0 0; }
+  .linked-item { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; margin-bottom: 8px; }
+  .linked-item .l-id { font-size: 11px; font-weight: 800; color: #0891b2; min-width: 62px; letter-spacing: .3px; }
+  .linked-item .l-title { flex: 1; font-size: 13px; cursor: pointer; }
+  .linked-item .l-title:hover { color: var(--accent); text-decoration: underline; }
+  .linked-item .l-del { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 0 4px; }
+  .linked-item .l-del:hover { color: #dc2626; }
+
+  .activity { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .activity h4 { margin: 0; font-size: 13px; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; }
+  .activity h4 .caret { display: inline-block; transition: transform .15s; font-size: 18px; line-height: 1; color: var(--accent); }
+  .activity:not(.collapsed) h4 .caret { transform: rotate(90deg); }
+  .activity .activity-body { margin-top: 10px; }
+  .activity.collapsed .activity-body { display: none; }
+  .log { list-style: none; padding: 0; margin: 0 0 12px; max-height: 150px; overflow-y: auto; }
+  .log li { font-size: 12px; color: var(--muted); padding: 4px 0; border-bottom: 1px dashed var(--border); }
+  .log li .who { color: var(--text); font-weight: 600; }
+  .comment-section { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .comment-section .section-label { margin: 0 0 10px; font-size: 13px; }
+  .comment-row { display: flex; gap: 8px; }
+  .comment-row input { flex: 1; }
+  .comment-editor { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--panel); }
+  .comment-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 6px 8px; border-bottom: 1px solid var(--border); background: var(--bg); }
+  .ct-btn { border: 1px solid transparent; background: none; color: var(--text); cursor: pointer; font-size: 12px; line-height: 1; padding: 5px 8px; border-radius: 6px; min-width: 28px; }
+  .ct-btn:hover { background: var(--panel); border-color: var(--border); }
+  .ct-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .ct-sep { width: 1px; align-self: stretch; background: var(--border); margin: 2px 4px; }
+  .ct-clear { display: inline-flex; align-items: center; justify-content: center; }
+  .ct-clear svg { display: block; }
+  .comment-input { min-height: 64px; max-height: 200px; overflow-y: auto; overflow-x: hidden; overflow-wrap: anywhere; word-break: break-word; padding: 10px 12px; font-size: 13px; color: var(--text); outline: none; }
+  .comment-input:empty:before { content: attr(data-placeholder); color: var(--muted); }
+  .comment-input p { margin: 0 0 6px; }
+  .comment-input ul, .comment-input ol { margin: 4px 0; padding-left: 22px; }
+  .comment-input a { color: var(--accent); }
+  .comment-actions { display: flex; justify-content: flex-end; padding: 6px 8px; border-top: 1px solid var(--border); background: var(--bg); }
+  .log li .comment-body { color: var(--text); }
+  .log li .comment-body ul, .log li .comment-body ol { margin: 4px 0; padding-left: 20px; }
+  .log li .comment-body a { color: var(--accent); }
+  .log li .comment-body p { margin: 0 0 4px; }
+  .timestamps { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* Notes */
+  .notes-panel { background: var(--panel); border-radius: 14px; box-shadow: var(--shadow); padding: 18px; }
+  .notes-top-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+  .notes-top-bar .note-search { flex: 1 1 220px; }
+  .notes-panel .note-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; list-style: none; margin: 0; padding: 0; }
+  .notes-panel .note-list-item { margin-bottom: 0; }
+  .notes-panel .note-list-empty { grid-column: 1 / -1; }
+  .note-modal { max-width: 820px; }
+  .note-modal .note-body { max-height: calc(100vh - 360px); }
+  .notes-app { display: flex; gap: 16px; align-items: flex-start; }
+  .notes-sidebar { flex: 0 0 280px; background: var(--panel); border-radius: 14px; box-shadow: var(--shadow); padding: 14px; max-height: calc(100vh - 150px); display: flex; flex-direction: column; }
+  .notes-side-top { margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .notes-side-top .btn { width: 100%; }
+  .meeting-help { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 4px 0 16px; }
+  .meeting-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); margin: 2px 0 4px; cursor: pointer; }
+  .meeting-check input { width: 16px; height: 16px; accent-color: var(--accent); }
+  .notes-side-tools { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+  .note-search, .note-sort { width: 100%; border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; font-size: 13px; font-family: inherit; background: #fff; color: var(--text); }
+  .note-search:focus, .note-sort:focus { outline: 2px solid rgba(99,102,241,.3); border-color: var(--accent); }
+  .note-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+  .note-list-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; transition: border-color .12s, background .12s; }
+  .note-list-item:hover { border-color: var(--accent); background: #fafbff; }
+  .note-list-item.active { border-color: var(--accent); background: #eef0fe; }
+  .nli-top { display: flex; align-items: center; gap: 8px; }
+  .nli-title { font-size: 13px; font-weight: 700; color: var(--text); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nli-title.untitled { color: var(--muted); font-weight: 600; font-style: italic; }
+  .nli-preview { font-size: 12px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nli-foot { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .nli-date { font-size: 11px; color: var(--muted); }
+  .nli-todo { font-size: 11px; color: var(--muted); margin-left: auto; }
+  .note-list-empty { font-size: 13px; color: var(--muted); padding: 14px 4px; text-align: center; }
+
+  .notes-main { flex: 1; min-width: 0; background: var(--panel); border-radius: 14px; box-shadow: var(--shadow); padding: 18px; min-height: 460px; }
+  .note-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 420px; color: var(--muted); }
+  .note-empty-art { font-size: 44px; }
+  .note-empty p { margin: 0; font-size: 14px; }
+  .note-editor-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+  .note-subject { flex: 1 1 200px; min-width: 0; border: none; border-bottom: 2px solid var(--border); border-radius: 0; padding: 6px 2px; font-size: 19px; font-weight: 700; font-family: inherit; color: var(--text); background: none; resize: none; overflow: hidden; line-height: 1.3; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+  .note-subject:focus { outline: none; border-bottom-color: var(--accent); }
+  .note-priority-sel { border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; font-size: 13px; font-family: inherit; background: #fff; color: var(--text); }
+  .note-editor-head .btn.danger { margin-left: 0; padding: 8px 12px; }
+  #note-to-ticket { padding: 8px 12px; font-weight: 700; }
+  #note-toolbar { border: 1px solid var(--border); border-bottom: none; border-radius: 10px 10px 0 0; }
+  .note-body { border: 1px solid var(--border); border-radius: 0 0 10px 10px; min-height: 320px; max-height: calc(100vh - 320px); overflow-y: auto; overflow-x: hidden; overflow-wrap: anywhere; word-break: break-word; padding: 16px; font-size: 15px; line-height: 1.65; color: var(--text); outline: none; }
+  .note-body:empty:before { content: attr(data-placeholder); color: var(--muted); }
+  .note-body ul, .note-body ol { margin: 6px 0; padding-left: 24px; }
+  .note-body h1 { font-size: 24px; font-weight: 800; margin: 14px 0 8px; line-height: 1.25; }
+  .note-body h2 { font-size: 19px; font-weight: 700; margin: 12px 0 6px; line-height: 1.3; }
+  .note-body h3 { font-size: 16px; font-weight: 700; margin: 10px 0 4px; color: var(--muted); text-transform: none; }
+  .note-body h1:first-child, .note-body h2:first-child, .note-body h3:first-child { margin-top: 0; }
+  .note-body a { color: var(--accent); }
+  .note-body .todo { display: flex; align-items: flex-start; gap: 8px; margin: 4px 0; }
+  .note-body .todo input[type=checkbox] { margin-top: 4px; width: 16px; height: 16px; flex: 0 0 auto; cursor: pointer; accent-color: var(--accent); }
+  .note-body .todo.done .todo-text { text-decoration: line-through; color: var(--muted); }
+  .todo-text { flex: 1; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+  .note-meta { font-size: 11px; color: var(--muted); margin-top: 10px; min-height: 14px; }
+  .note-meta .meta-saved { color: var(--done); }
+
+  @media (max-width: 900px) {
+    .notes-app { flex-direction: column; }
+    .notes-sidebar { flex: none; width: 100%; max-height: 260px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">V</div>
+    <div class="brand-text">
+      <h1>VYT's Zone</h1>
+      <p>Kanban board &amp; notes</p>
+    </div>
+  </div>
+  <nav>
+    <button class="tab active" data-view="board">Board</button>
+    <button class="tab" data-view="notes">Notes</button>
+  </nav>
+  <div class="saved-ind"><span class="dot-green"></span> Saved locally</div>
+</header>
+
+<main>
+  <section class="view active" id="board">
+    <div class="epics-bar">
+      <span class="epics-label">Epics</span>
+      <input id="epic-filter" class="epic-filter" placeholder="🔍 Filter epics…">
+      <div class="epics-list" id="epics-list"></div>
+      <button class="btn-epic-new" id="new-epic-btn">+ New epic</button>
+      <span class="epics-count" id="epics-count"></span>
+    </div>
+
+    <div class="filter-bar">
+      <input id="flt-search" class="flt-search" placeholder="Search by title, description, or label…">
+      <select id="flt-priority"><option value="">All priorities</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select>
+      <select id="flt-epic"><option value="">All epics</option></select>
+      <select id="flt-label"><option value="">All labels</option></select>
+      <button class="flt-clear" id="flt-clear">Clear</button>
+      <span class="flt-count" id="flt-count"></span>
+    </div>
+
+    <div class="board" id="kanban"></div>
+  </section>
+
+  <section class="view" id="notes-view">
+    <div class="notes-panel">
+      <div class="notes-top-bar">
+        <button class="btn primary" id="note-new">+ New note</button>
+        <button class="btn ghost" id="note-meeting">🎙 Meeting note</button>
+        <input id="note-search" class="note-search" placeholder="Search notes…">
+        <select id="note-sort" class="note-sort">
+          <option value="updated">Recently updated</option>
+          <option value="created">Newest first</option>
+          <option value="subject">Subject A–Z</option>
+          <option value="priority">Priority</option>
+        </select>
+      </div>
+      <ul class="note-list" id="note-list"></ul>
+    </div>
+  </section>
+
+<!-- Note editor modal -->
+<div class="overlay" id="note-overlay">
+  <div class="modal note-modal">
+        <div class="note-editor" id="note-editor">
+          <div class="note-editor-head">
+            <textarea id="note-subject" class="note-subject" rows="1" placeholder="Note subject…"></textarea>
+            <select id="note-priority" class="note-priority-sel">
+              <option value="">No priority</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+            <button class="btn ghost" id="note-to-ticket" title="Create a board ticket from this note">↗ Create ticket</button>
+            <button class="btn danger" id="note-delete" title="Delete note">Delete</button>
+          </div>
+          <div class="comment-toolbar" id="note-toolbar">
+            <button type="button" class="ct-btn" data-cmd="h1" title="Heading 1">H1</button>
+            <button type="button" class="ct-btn" data-cmd="h2" title="Heading 2">H2</button>
+            <button type="button" class="ct-btn" data-cmd="h3" title="Heading 3">H3</button>
+            <span class="ct-sep"></span>
+            <button type="button" class="ct-btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+            <button type="button" class="ct-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+            <button type="button" class="ct-btn" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+            <span class="ct-sep"></span>
+            <button type="button" class="ct-btn" data-cmd="insertUnorderedList" title="Bullet list">&bull;&#8202;List</button>
+            <button type="button" class="ct-btn" data-cmd="insertOrderedList" title="Numbered list">1.&#8202;List</button>
+            <button type="button" class="ct-btn" data-cmd="checkbox" title="Checklist item">&#9745;&#8202;To-do</button>
+            <span class="ct-sep"></span>
+            <button type="button" class="ct-btn" data-cmd="createLink" title="Insert link">🔗 Link</button>
+            <button type="button" class="ct-btn ct-clear" data-cmd="removeFormat" title="Clear formatting — removes bold, headings, lists and links from the selected text" aria-label="Clear formatting"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.24 3.56l4.2 4.2a1.5 1.5 0 0 1 0 2.12L11.66 18.6a2 2 0 0 1-2.83 0L4.1 13.86a1.5 1.5 0 0 1 0-2.12l8.02-8.18a1.5 1.5 0 0 1 2.12 0z"/><path d="M9 18.6H20"/></svg></button>
+          </div>
+          <div id="note-body" class="note-body" contenteditable="true" data-placeholder="Start writing… use the toolbar to add lists, checkboxes and links."></div>
+          <div class="note-meta" id="note-meta"></div>
+        </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="note-close">Close</button>
+    </div>
+  </div>
+</div>
+</main>
+
+<!-- Ticket modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3 id="m-heading">New ticket</h3>
+    <div class="sub" id="m-id"></div>
+
+    <div class="field">
+      <label>Title</label>
+      <input id="f-title" placeholder="Short summary of the work">
+      <div class="error" id="f-title-error">Please enter a title before saving.</div>
+    </div>
+
+    <div id="m-extra-fields">
+      <div class="field">
+        <label>Description</label>
+        <div class="rich-toolbar" id="f-desc-toolbar">
+          <select class="rt-block" id="rt-block" title="Text style">
+            <option value="p">Normal</option>
+            <option value="h1">Heading 1</option>
+            <option value="h2">Heading 2</option>
+            <option value="h3">Heading 3</option>
+          </select>
+          <span class="rt-sep"></span>
+          <button type="button" class="rt-btn" data-cmd="bold" title="Bold (⌘B)"><b>B</b></button>
+          <button type="button" class="rt-btn" data-cmd="italic" title="Italic (⌘I)"><i>I</i></button>
+          <button type="button" class="rt-btn" data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
+          <button type="button" class="rt-btn" data-cmd="code" title="Inline code"><span class="mono">&lt;/&gt;</span></button>
+          <span class="rt-sep"></span>
+          <button type="button" class="rt-btn" data-cmd="insertUnorderedList" title="Bulleted list">≡</button>
+          <button type="button" class="rt-btn" data-cmd="insertOrderedList" title="Numbered list"><span class="mono">1.</span></button>
+          <button type="button" class="rt-btn" data-cmd="quote" title="Quote">❝</button>
+          <span class="rt-sep"></span>
+          <button type="button" class="rt-btn" data-cmd="link" title="Add link (⌘K)">🔗</button>
+        </div>
+        <div id="f-desc" class="rich" contenteditable="true" data-placeholder="Details, context, acceptance criteria…"></div>
+        <div class="rich-hint">Use the toolbar to format · select text and press <kbd>⌘K</kbd> to add a link · click a link to open it</div>
+      </div>
+      <div class="row3">
+        <div class="field">
+          <label>Priority</label>
+          <select id="f-priority">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="f-status">
+            <option value="todo">To Do</option>
+            <option value="progress">In Progress</option>
+            <option value="blocked">Blocked</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Due date</label>
+          <input id="f-due" type="date">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Labels</label>
+          <input id="f-labels" placeholder="comma, separated">
+        </div>
+        <div class="field">
+          <label>Epic (optional)</label>
+          <div class="combo" id="epic-combo">
+            <input id="f-epic-input" class="combo-input" placeholder="Search or create an epic…" autocomplete="off">
+            <input type="hidden" id="f-epic">
+            <div class="combo-menu" id="epic-menu"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Linked tickets (optional)</label>
+        <div class="link-row">
+          <input id="f-linksearch" class="linksearch" placeholder="🔍 Search…">
+          <select id="f-linksel"><option value="">Select a ticket to link…</option></select>
+          <button type="button" class="btn ghost" id="f-link-add">Link</button>
+        </div>
+        <ul class="linked-list" id="f-linked-list"></ul>
+      </div>
+
+      <div class="field">
+        <label>Attachments (optional)</label>
+        <div class="dropzone" id="f-dropzone">
+          <div class="dz-text">Drag &amp; drop files here</div>
+          <button type="button" class="btn-attach" id="f-attach-btn">📎 Attach file</button>
+          <input type="file" id="f-file-input" multiple hidden>
+        </div>
+        <div class="link-row">
+          <input id="f-link-url" placeholder="Or paste a website link (https://…)">
+          <button type="button" class="btn ghost" id="f-link-btn">Add link</button>
+        </div>
+        <ul class="attach-list" id="f-attach-list"></ul>
+      </div>
+    </div>
+
+    <div class="timestamps" id="m-timestamps"></div>
+
+    <div class="comment-section" id="m-comment-section" style="display:none">
+      <h4 class="section-label">Comment</h4>
+      <div class="comment-editor">
+        <div class="comment-toolbar" id="f-comment-toolbar">
+          <button type="button" class="ct-btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button type="button" class="ct-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+          <button type="button" class="ct-btn" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+          <span class="ct-sep"></span>
+          <button type="button" class="ct-btn" data-cmd="insertUnorderedList" title="Bullet list">&bull;&#8202;List</button>
+          <button type="button" class="ct-btn" data-cmd="insertOrderedList" title="Numbered list">1.&#8202;List</button>
+          <span class="ct-sep"></span>
+          <button type="button" class="ct-btn" data-cmd="createLink" title="Insert link">🔗 Link</button>
+          <button type="button" class="ct-btn ct-clear" data-cmd="removeFormat" title="Clear formatting — removes bold, headings, lists and links from the selected text" aria-label="Clear formatting"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.24 3.56l4.2 4.2a1.5 1.5 0 0 1 0 2.12L11.66 18.6a2 2 0 0 1-2.83 0L4.1 13.86a1.5 1.5 0 0 1 0-2.12l8.02-8.18a1.5 1.5 0 0 1 2.12 0z"/><path d="M9 18.6H20"/></svg></button>
+        </div>
+        <div id="f-comment" class="comment-input" contenteditable="true" data-placeholder="Add a comment…"></div>
+        <div class="comment-actions">
+          <button class="btn ghost" id="m-comment-btn">Post</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="activity collapsed" id="m-activity" style="display:none">
+      <h4 id="m-activity-toggle"><span class="caret">▸</span> History</h4>
+      <div class="activity-body">
+        <ul class="log" id="m-log"></ul>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <span class="m-saved" id="m-saved">Saved ✓</span>
+      <button class="btn ghost" id="m-cancel">Close</button>
+      <button class="btn danger" id="m-delete" style="display:none">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Epic modal -->
+<div class="overlay" id="epic-overlay">
+  <div class="modal" style="max-width:440px">
+    <h3>New epic</h3>
+    <div class="sub">Epics are optional categories you can group tickets under.</div>
+
+    <div class="field">
+      <label>Name</label>
+      <input id="e-name" placeholder="e.g. Q3 Launch">
+      <div class="error" id="e-name-error">Please enter an epic name.</div>
+    </div>
+    <div class="field">
+      <label>Description (optional)</label>
+      <textarea id="e-desc" placeholder="What does this epic cover?"></textarea>
+    </div>
+    <div class="field">
+      <label>Color</label>
+      <div class="swatches" id="e-swatches"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn primary" id="e-save">Save epic</button>
+      <button class="btn ghost" id="e-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Epic detail modal -->
+<div class="overlay" id="epic-detail-overlay">
+  <div class="modal" style="max-width:560px">
+    <h3 id="ed-name"><span class="ed-dot" id="ed-dot"></span><span id="ed-title"></span></h3>
+    <div class="sub" id="ed-desc"></div>
+
+    <div class="progress-wrap">
+      <div class="progress-top">
+        <span id="ed-pct">0% complete</span>
+        <span id="ed-counts" class="muted-sm"></span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="ed-fill"></div></div>
+      <div class="progress-legend" id="ed-legend"></div>
+    </div>
+
+    <div class="ed-tickets-head">Linked tickets</div>
+    <ul class="ed-tickets" id="ed-tickets"></ul>
+
+    <div class="modal-actions">
+      <button class="btn ghost" id="ed-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⌘K link popover -->
+<div class="link-pop" id="link-pop">
+  <label for="lp-url">Link URL</label>
+  <input id="lp-url" placeholder="Paste a link, then press Enter">
+  <div class="lp-actions">
+    <button class="btn primary" id="lp-apply">Apply</button>
+    <button class="btn ghost lp-remove" id="lp-remove" style="display:none">Remove link</button>
+  </div>
+</div>
+
+<!-- Confirm modal -->
+<div class="overlay" id="confirm-overlay">
+  <div class="modal confirm-modal">
+    <div class="confirm-icon">⚠️</div>
+    <h3 id="c-heading">Are you sure you want to delete?</h3>
+    <p class="confirm-msg" id="c-msg"></p>
+    <div class="modal-actions confirm-actions">
+      <button class="btn ghost" id="c-cancel">Cancel</button>
+      <button class="btn danger-solid" id="c-confirm">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Meeting note import modal -->
+<div class="overlay" id="meeting-overlay">
+  <div class="modal" style="max-width:600px">
+    <h3>New meeting note</h3>
+    <div class="sub">Summary · action-item checklist · transcript</div>
+    <p class="meeting-help">Granola records and transcribes your Teams call. Ask Claude to <em>“summarise my last meeting as a meeting note”</em>, then paste the result below — it becomes a note with a summary, a checklist of action items, and the full transcript.</p>
+    <div class="field">
+      <label>Subject (optional)</label>
+      <input id="meeting-subject" placeholder="e.g. Weekly sync — 18 Jun">
+    </div>
+    <div class="field">
+      <label>Meeting content</label>
+      <textarea id="meeting-input" style="min-height:200px" placeholder="Paste the summary, action items and transcript here. Markdown works:&#10;# Heading   ## Sub-heading&#10;- [ ] action item   - bullet&#10;**bold**   [link](https://…)"></textarea>
+    </div>
+    <label class="meeting-check"><input type="checkbox" id="meeting-make-tickets"> Also create a board ticket for each action item</label>
+    <div class="modal-actions">
+      <button class="btn ghost" id="meeting-cancel">Cancel</button>
+      <button class="btn primary" id="meeting-create">Create note</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  var STORE_CARDS = "vytzone.tickets.v2";
+  var STORE_NOTES = "vytzone.notes.v1";
+  var STORE_SEQ   = "vytzone.seq.v1";
+  var STORE_EPICS = "vytzone.epics.v1";
+
+  var EPIC_COLORS = ["#7c3aed", "#2563eb", "#0891b2", "#059669", "#ca8a04", "#ea580c", "#dc2626", "#db2777"];
+  var epics = load(STORE_EPICS, []);
+  function persistEpics() { save(STORE_EPICS, epics); }
+  function findEpic(eid) { for (var i = 0; i < epics.length; i++) { if (epics[i].id === eid) return epics[i]; } return null; }
+
+  // styled confirm dialog (replaces native confirm)
+  var _confirmCb = null;
+  function confirmDelete(message, onConfirm, heading) {
+    _confirmCb = onConfirm;
+    document.getElementById("c-heading").textContent = heading || "Are you sure you want to delete?";
+    document.getElementById("c-msg").textContent = message || "";
+    document.getElementById("confirm-overlay").classList.add("open");
+  }
+
+  var COLUMNS = [
+    { id: "todo",     title: "To Do" },
+    { id: "progress", title: "In Progress" },
+    { id: "blocked",  title: "Blocked" },
+    { id: "done",     title: "Done" }
+  ];
+  var STATUS_TITLE = {};
+  COLUMNS.forEach(function (c) { STATUS_TITLE[c.id] = c.title; });
+
+  function load(key, fallback) {
+    try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+    catch (e) { return fallback; }
+  }
+  function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch (e) { return false; } }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function nextSeq() {
+    var n = (load(STORE_SEQ, 0) || 0) + 1;
+    save(STORE_SEQ, n);
+    return "VYT-" + String(n).padStart(3, "0");
+  }
+  function now() { return new Date().toISOString(); }
+  function fmtDate(iso) {
+    if (!iso) return "";
+    var d = new Date(iso.length === 10 ? iso + "T00:00:00" : iso);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+  function isOverdue(due, status) {
+    if (!due || status === "done") return false;
+    return new Date(due + "T23:59:59") < new Date();
+  }
+
+  // migrate / seed
+  var cards = load(STORE_CARDS, null);
+  if (!cards) {
+    cards = { todo: [], progress: [], blocked: [], done: [] };
+    cards.todo.push(newTicket({ title: "Click a ticket to edit all its details", priority: "medium", status: "todo" }));
+    cards.todo.push(newTicket({ title: "Drag tickets between columns", priority: "low", status: "todo" }));
+    cards.progress.push(newTicket({ title: "Everything saves automatically", priority: "medium", status: "progress" }));
+    cards.done.push(newTicket({ title: "Set up VYT's Zone", priority: "high", status: "done" }));
+    persist();
+  }
+  COLUMNS.forEach(function (c) { if (!cards[c.id]) cards[c.id] = []; });
+
+  function newTicket(o) {
+    return {
+      id: uid(),
+      ticketId: nextSeq(),
+      title: o.title || "Untitled",
+      desc: o.desc || "",
+      priority: o.priority || "medium",
+      status: o.status || "todo",
+      due: o.due || "",
+      labels: o.labels || [],
+      epic: o.epic || "",
+      attachments: o.attachments || [],
+      links: o.links || [],
+      created: now(),
+      updated: now(),
+      log: o.log || []
+    };
+  }
+  function purgeLinksTo(idToRemove) {
+    Object.keys(cards).forEach(function (k) {
+      (cards[k] || []).forEach(function (c) {
+        if (c.links && c.links.indexOf(idToRemove) !== -1) c.links = c.links.filter(function (x) { return x !== idToRemove; });
+      });
+    });
+  }
+  function persist() {
+    if (!save(STORE_CARDS, cards)) {
+      alert("Couldn't save — your browser storage is full. This usually means attachments are too large. Try removing a large attachment.");
+    }
+  }
+  function findCard(cid) {
+    var found = null;
+    Object.keys(cards).forEach(function (k) {
+      (cards[k] || []).forEach(function (c) { if (c.id === cid) found = c; });
+    });
+    return found;
+  }
+
+  // --- tabs ---
+  document.querySelectorAll(".tab").forEach(function (t) {
+    t.addEventListener("click", function () {
+      document.querySelectorAll(".tab").forEach(function (x) { x.classList.remove("active"); });
+      document.querySelectorAll(".view").forEach(function (x) { x.classList.remove("active"); });
+      t.classList.add("active");
+      document.getElementById(t.dataset.view === "board" ? "board" : "notes-view").classList.add("active");
+    });
+  });
+
+  // --- filters ---
+  function getFilters() {
+    return {
+      search: byId("flt-search").value.trim().toLowerCase(),
+      priority: byId("flt-priority").value,
+      epic: byId("flt-epic").value,
+      label: byId("flt-label").value
+    };
+  }
+  function filtersActive(f) { return !!(f.search || f.priority || f.epic || f.label); }
+  function cardMatches(c, f) {
+    if (f.priority && c.priority !== f.priority) return false;
+    if (f.epic === "__none__") { if (c.epic) return false; }
+    else if (f.epic && c.epic !== f.epic) return false;
+    if (f.label && (c.labels || []).indexOf(f.label) === -1) return false;
+    if (f.search) {
+      var hay = (c.title + " " + stripHTML(c.desc) + " " + (c.labels || []).join(" ")).toLowerCase();
+      if (hay.indexOf(f.search) === -1) return false;
+    }
+    return true;
+  }
+  function allTickets() {
+    var out = []; COLUMNS.forEach(function (col) { (cards[col.id] || []).forEach(function (c) { out.push(c); }); }); return out;
+  }
+  function populateFilterOptions() {
+    // epics
+    var es = byId("flt-epic"), eVal = es.value;
+    es.innerHTML = '<option value="">All epics</option><option value="__none__">— No epic —</option>';
+    epics.forEach(function (ep) { var o = document.createElement("option"); o.value = ep.id; o.textContent = ep.name; es.appendChild(o); });
+    es.value = eVal;
+    // labels from existing tickets
+    var labels = {};
+    allTickets().forEach(function (c) {
+      (c.labels || []).forEach(function (l) { if (l) labels[l] = 1; });
+    });
+    fillSelect(byId("flt-label"), "All labels", Object.keys(labels).sort());
+  }
+  function fillSelect(sel, allLabel, values) {
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">' + allLabel + '</option>';
+    values.forEach(function (v) { var o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); });
+    if (values.indexOf(cur) !== -1) sel.value = cur; else sel.value = "";
+  }
+
+  // --- render ---
+  var board = document.getElementById("kanban");
+  var filterOn = false;
+  function render() {
+    populateFilterOptions();
+    var f = getFilters();
+    var active = filtersActive(f);
+    filterOn = active; // set before building cards so draggable reflects current state
+    document.querySelector(".filter-bar").classList.toggle("active", active);
+    var totalAll = 0, totalShown = 0;
+
+    board.innerHTML = "";
+    COLUMNS.forEach(function (col) {
+      var list = cards[col.id] || (cards[col.id] = []);
+      var shown = list.filter(function (c) { return cardMatches(c, f); });
+      totalAll += list.length; totalShown += shown.length;
+      var column = el("div", "column"); column.dataset.col = col.id;
+
+      var head = el("div", "col-head");
+      head.appendChild(el("span", "dot"));
+      head.appendChild(document.createTextNode(col.title));
+      var count = el("span", "count"); count.textContent = active ? (shown.length + "/" + list.length) : list.length; head.appendChild(count);
+      var colAdd = el("button", "col-add"); colAdd.textContent = "+"; colAdd.title = "Add a ticket";
+      colAdd.addEventListener("click", function () { openModal(null, col.id); });
+      head.appendChild(colAdd);
+      column.appendChild(head);
+
+      var cardsEl = el("div", "cards"); cardsEl.dataset.col = col.id;
+      if (!shown.length) {
+        var emp = el("div", "empty-col"); emp.textContent = active ? "No matching tickets" : "No tickets yet";
+        cardsEl.appendChild(emp);
+      } else {
+        shown.forEach(function (c) { cardsEl.appendChild(makeCard(c, col.id)); });
+      }
+      column.appendChild(cardsEl);
+
+      cardsEl.addEventListener("dragover", function (e) {
+        e.preventDefault(); cardsEl.classList.add("drop-hint");
+        // auto-scroll the column when dragging near its top/bottom edge
+        var rect = cardsEl.getBoundingClientRect(), edge = 44;
+        if (e.clientY < rect.top + edge) cardsEl.scrollTop -= 14;
+        else if (e.clientY > rect.bottom - edge) cardsEl.scrollTop += 14;
+        var after = getDragAfter(cardsEl, e.clientY);
+        var dragging = document.querySelector(".dragging");
+        if (!dragging) return;
+        if (after == null) cardsEl.appendChild(dragging); else cardsEl.insertBefore(dragging, after);
+      });
+      cardsEl.addEventListener("dragleave", function () { cardsEl.classList.remove("drop-hint"); });
+      cardsEl.addEventListener("drop", function (e) { e.preventDefault(); cardsEl.classList.remove("drop-hint"); syncFromDom(); });
+
+      board.appendChild(column);
+    });
+    byId("flt-count").textContent = active ? ("Showing " + totalShown + " of " + totalAll + " tickets") : "";
+    renderEpics(); // keep epic completion % in sync with ticket changes
+  }
+
+  function makeCard(c, colId) {
+    var card = el("div", "card"); card.draggable = !filterOn; card.dataset.id = c.id;
+
+    var idEl = el("div", "id"); idEl.textContent = c.ticketId; card.appendChild(idEl);
+    var title = el("div", "title"); title.textContent = c.title; card.appendChild(title);
+
+    var meta = el("div", "meta");
+    var pr = el("span", "badge " + c.priority); pr.textContent = cap(c.priority); meta.appendChild(pr);
+    if (c.due) {
+      var due = el("span", "chip due" + (isOverdue(c.due, colId) ? " overdue" : ""));
+      due.textContent = "📅 " + fmtDate(c.due); meta.appendChild(due);
+    }
+    if (c.epic) {
+      var ep = el("span", "chip epic");
+      var epicObj = findEpic(c.epic);
+      if (epicObj) { ep.textContent = "🏷 " + epicObj.name; ep.style.background = epicObj.color; ep.style.color = "#fff"; ep.style.borderColor = epicObj.color; }
+      else { ep.textContent = "🏷 " + c.epic; } // legacy free-text fallback
+      meta.appendChild(ep);
+    }
+    (c.labels || []).forEach(function (l) { if (l) { var lb = el("span", "chip label"); lb.textContent = l; meta.appendChild(lb); } });
+    if (c.attachments && c.attachments.length) { var at = el("span", "chip attach"); at.textContent = "📎 " + c.attachments.length; meta.appendChild(at); }
+    if (c.links && c.links.length) { var lk = el("span", "chip links"); lk.textContent = "🔗 " + c.links.length; meta.appendChild(lk); }
+    card.appendChild(meta);
+
+    var del = el("button", "del"); del.innerHTML = "&times;"; del.title = "Delete";
+    del.addEventListener("click", function (e) {
+      e.stopPropagation();
+      confirmDelete("Ticket " + c.ticketId + ' "' + c.title + '" will be permanently deleted. This cannot be undone.', function () {
+        cards[colId] = cards[colId].filter(function (x) { return x.id !== c.id; });
+        purgeLinksTo(c.id);
+        persist(); render();
+      });
+    });
+    card.appendChild(del);
+
+    card.addEventListener("click", function (e) { if (e.target === del) return; openModal(c.id, colId); });
+    card.addEventListener("dragstart", function (e) { if (e.target.tagName === "INPUT") return; card.classList.add("dragging"); });
+    card.addEventListener("dragend", function () { card.classList.remove("dragging"); syncFromDom(); });
+    return card;
+  }
+
+  function getDragAfter(container, y) {
+    var els = [].slice.call(container.querySelectorAll(".card:not(.dragging)"));
+    var closest = { offset: -Infinity, el: null };
+    els.forEach(function (child) {
+      var box = child.getBoundingClientRect();
+      var offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) closest = { offset: offset, el: child };
+    });
+    return closest.el;
+  }
+
+  function syncFromDom() {
+    var next = {};
+    COLUMNS.forEach(function (col) {
+      next[col.id] = [];
+      var container = board.querySelector('.cards[data-col="' + col.id + '"]');
+      if (!container) return;
+      [].slice.call(container.querySelectorAll(".card")).forEach(function (cardEl) {
+        var c = findCard(cardEl.dataset.id);
+        if (c) {
+          if (c.status !== col.id) { c.status = col.id; c.updated = now(); addLog(c, "moved to " + STATUS_TITLE[col.id]); }
+          next[col.id].push(c);
+        }
+      });
+    });
+    cards = next; persist(); render();
+  }
+
+  // --- modal ---
+  var overlay = document.getElementById("overlay");
+  var editingId = null, editingCol = null, draftAttachments = [], draftLinks = [];
+  var MAX_ATTACH_BYTES = 3 * 1024 * 1024; // ~3 MB per file (browser storage is limited)
+  var F = {
+    title: byId("f-title"), desc: byId("f-desc"), priority: byId("f-priority"),
+    status: byId("f-status"), due: byId("f-due"),
+    labels: byId("f-labels"), epic: byId("f-epic"), comment: byId("f-comment")
+  };
+
+  function openModal(cid, colId) {
+    editingId = cid; editingCol = colId;
+    var c = cid ? findCard(cid) : null;
+    byId("m-heading").textContent = c ? "Edit ticket" : "New ticket";
+    byId("m-id").textContent = c ? c.ticketId : "Start typing a title to create this ticket";
+    F.title.value = c ? c.title : "";
+    F.desc.innerHTML = (c && c.desc) ? toEditorHTML(c.desc) : "";
+    F.priority.value = c ? c.priority : "medium";
+    F.status.value = c ? c.status : (colId || "todo");
+    F.due.value = c ? c.due : "";
+    F.labels.value = c ? (c.labels || []).join(", ") : "";
+    populateEpicSelect(c ? c.epic : "");
+    F.comment.innerHTML = "";
+    draftAttachments = (c && c.attachments) ? c.attachments.slice() : [];
+    byId("f-link-url").value = "";
+    byId("f-file-input").value = "";
+    renderAttachList();
+    draftLinks = (c && c.links) ? c.links.slice() : [];
+    byId("f-linksearch").value = "";
+    renderLinkedList();
+
+    // All fields are always shown; only Title is required.
+    byId("m-extra-fields").style.display = "block";
+    byId("m-delete").style.display = c ? "inline-block" : "none";
+    byId("m-comment-section").style.display = c ? "block" : "none";
+    byId("m-activity").style.display = c ? "block" : "none";
+    byId("m-activity").classList.add("collapsed"); // start collapsed each time
+    byId("m-timestamps").textContent = c ? ("Created " + fmtDateTime(c.created) + " · Updated " + fmtDateTime(c.updated)) : "";
+    if (c) renderLog(c);
+    clearTitleError();
+
+    overlay.classList.add("open");
+    closeLinkPop();
+    lastSel = null; updateToolbarState();
+    F.title.focus();
+  }
+  function closeModal() { overlay.classList.remove("open"); editingId = null; editingCol = null; clearTitleError(); }
+
+  // --- rich description field (plain text + ⌘K links) ---
+  // Old descriptions were plain text; convert them so line breaks survive.
+  function toEditorHTML(s) {
+    if (/<[a-z][\s\S]*>/i.test(s)) return s;          // already HTML (new tickets)
+    return esc(s).replace(/\n/g, "<br>");             // legacy plain text
+  }
+  // Read the editor's content for saving; collapse a visually-empty field to "".
+  function getDesc() {
+    if (F.desc.textContent.trim() === "" && !F.desc.querySelector("a,img")) return "";
+    return F.desc.innerHTML.trim();
+  }
+  function stripHTML(s) { var d = document.createElement("div"); d.innerHTML = s || ""; return d.textContent || ""; }
+  // keep the :empty placeholder working when the browser leaves a stray <br>,
+  // but never wipe a structural block the user is about to type into
+  F.desc.addEventListener("input", function () {
+    if (this.textContent.trim() === "" && !this.querySelector("a,img,ul,ol,blockquote,h1,h2,h3,code,pre")) this.innerHTML = "";
+  });
+  // click a link to open it in a new tab (edit/remove a link with ⌘K)
+  F.desc.addEventListener("click", function (e) {
+    var a = e.target.closest ? e.target.closest("a") : null;
+    if (a && a.href) { window.open(a.href, "_blank", "noopener,noreferrer"); e.preventDefault(); }
+  });
+  // ⌘K / Ctrl+K opens the link popover
+  F.desc.addEventListener("keydown", function (e) {
+    if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); openLinkPop(); }
+  });
+
+  var linkPop = byId("link-pop"), savedRange = null;
+  function anchorAtSelection() {
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+    var n = sel.anchorNode;
+    while (n && n !== F.desc) { if (n.nodeName === "A") return n; n = n.parentNode; }
+    return null;
+  }
+  function openLinkPop() {
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    savedRange = sel.getRangeAt(0).cloneRange();
+    var a = anchorAtSelection();
+    byId("lp-url").value = a ? (a.getAttribute("href") || "") : "";
+    byId("lp-remove").style.display = a ? "inline-block" : "none";
+    var r;
+    try { r = savedRange.getBoundingClientRect(); } catch (err) { r = null; }
+    if (!r || (!r.width && !r.height && !r.top)) r = F.desc.getBoundingClientRect();
+    linkPop.style.display = "block";
+    var w = linkPop.offsetWidth || 290, h = linkPop.offsetHeight || 90;
+    linkPop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + "px";
+    linkPop.style.top = Math.max(8, Math.min((r.bottom || r.top) + 6, window.innerHeight - h - 8)) + "px";
+    byId("lp-url").focus(); byId("lp-url").select();
+  }
+  function closeLinkPop() { linkPop.style.display = "none"; savedRange = null; }
+  function restoreRange() {
+    if (!savedRange) return;
+    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(savedRange);
+  }
+  function normalizeLinks() {
+    [].slice.call(F.desc.querySelectorAll("a")).forEach(function (x) {
+      x.target = "_blank"; x.rel = "noopener noreferrer";
+      x.title = x.getAttribute("href") + "  (click to open)";
+    });
+  }
+  function applyLink() {
+    var url = byId("lp-url").value.trim();
+    if (!url) return;
+    if (!/^(https?:|mailto:)/i.test(url)) url = "https://" + url;
+    F.desc.focus(); restoreRange();
+    var a = anchorAtSelection();
+    if (a) {
+      a.setAttribute("href", url);
+    } else if (savedRange && savedRange.collapsed) {
+      var node = document.createElement("a"); node.href = url; node.textContent = url;
+      savedRange.insertNode(node);
+      savedRange.setStartAfter(node); savedRange.collapse(true);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(savedRange);
+    } else {
+      document.execCommand("createLink", false, url);
+    }
+    normalizeLinks();
+    closeLinkPop(); saveNow();
+  }
+  function removeLink() {
+    F.desc.focus(); restoreRange();
+    var a = anchorAtSelection();
+    if (a) { var p = a.parentNode; while (a.firstChild) p.insertBefore(a.firstChild, a); p.removeChild(a); }
+    else { document.execCommand("unlink"); }
+    closeLinkPop(); saveNow();
+  }
+  byId("lp-apply").addEventListener("click", applyLink);
+  byId("lp-remove").addEventListener("click", removeLink);
+  byId("lp-url").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); applyLink(); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); F.desc.focus(); closeLinkPop(); }
+  });
+  document.addEventListener("mousedown", function (e) {
+    if (linkPop.style.display === "block" && !linkPop.contains(e.target) && e.target !== F.desc && !F.desc.contains(e.target)) closeLinkPop();
+  });
+
+  // --- formatting toolbar ---
+  var toolbar = byId("f-desc-toolbar");
+  try { document.execCommand("styleWithCSS", false, false); } catch (e) {}
+  function parentTag(node, tag) {
+    while (node && node !== F.desc) { if (node.nodeName === tag) return node; node = node.parentNode; }
+    return null;
+  }
+  function toggleInlineCode() {
+    var sel = window.getSelection(); if (!sel.rangeCount) return;
+    var codeEl = parentTag(sel.anchorNode, "CODE");
+    if (codeEl) { var p = codeEl.parentNode; while (codeEl.firstChild) p.insertBefore(codeEl.firstChild, codeEl); p.removeChild(codeEl); return; }
+    var range = sel.getRangeAt(0); if (range.collapsed) return;
+    var code = document.createElement("code");
+    try { range.surroundContents(code); }
+    catch (err) { code.appendChild(range.extractContents()); range.insertNode(code); }
+  }
+  function applyCommand(cmd) {
+    F.desc.focus(); restoreSel();
+    if (cmd === "link") { openLinkPop(); return; }
+    if (cmd === "quote") {
+      var inQuote = parentTag(window.getSelection().anchorNode, "BLOCKQUOTE");
+      document.execCommand("formatBlock", false, inQuote ? "p" : "blockquote");
+    } else if (cmd === "code") { toggleInlineCode(); }
+    else { document.execCommand(cmd, false, null); }
+    normalizeLinks(); updateToolbarState(); saveNow();
+  }
+  // keep the editor's selection alive while interacting with the toolbar
+  toolbar.addEventListener("mousedown", function (e) { if (e.target.closest(".rt-btn")) e.preventDefault(); });
+  toolbar.addEventListener("click", function (e) {
+    var btn = e.target.closest(".rt-btn"); if (!btn) return;
+    applyCommand(btn.dataset.cmd);
+  });
+  byId("rt-block").addEventListener("change", function () {
+    var v = this.value; F.desc.focus(); restoreSel();
+    document.execCommand("formatBlock", false, v);
+    updateToolbarState(); saveNow();
+  });
+
+  // track the live selection so dropdown/button focus changes don't lose it
+  var lastSel = null;
+  function saveSel() {
+    var sel = window.getSelection();
+    if (sel && sel.rangeCount && F.desc.contains(sel.anchorNode)) lastSel = sel.getRangeAt(0).cloneRange();
+  }
+  function restoreSel() {
+    if (!lastSel) return;
+    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(lastSel);
+  }
+  document.addEventListener("selectionchange", function () { saveSel(); if (F.desc.contains(window.getSelection().anchorNode)) updateToolbarState(); });
+
+  var STATE_CMDS = ["bold", "italic", "strikeThrough", "insertUnorderedList", "insertOrderedList"];
+  function updateToolbarState() {
+    if (!overlay.classList.contains("open")) return;
+    var anchor = window.getSelection().anchorNode;
+    [].slice.call(toolbar.querySelectorAll(".rt-btn")).forEach(function (b) {
+      var cmd = b.dataset.cmd, on = false;
+      if (STATE_CMDS.indexOf(cmd) !== -1) { try { on = document.queryCommandState(cmd); } catch (e) {} }
+      else if (cmd === "code") on = !!parentTag(anchor, "CODE");
+      else if (cmd === "quote") on = !!parentTag(anchor, "BLOCKQUOTE");
+      b.classList.toggle("active", on);
+    });
+    var h = "p";
+    ["H1", "H2", "H3"].forEach(function (t) { if (parentTag(anchor, t)) h = t.toLowerCase(); });
+    byId("rt-block").value = h;
+  }
+  F.desc.addEventListener("keyup", updateToolbarState);
+  F.desc.addEventListener("mouseup", updateToolbarState);
+
+  // collapsible History section
+  byId("m-activity-toggle").addEventListener("click", function () {
+    byId("m-activity").classList.toggle("collapsed");
+  });
+
+  function showTitleError() { byId("f-title-error").classList.add("show"); F.title.classList.add("invalid"); F.title.focus(); }
+  function clearTitleError() { byId("f-title-error").classList.remove("show"); F.title.classList.remove("invalid"); }
+  F_titleClearOnType();
+  function F_titleClearOnType() { byId("f-title").addEventListener("input", clearTitleError); }
+
+  function renderLog(c) {
+    var ul = byId("m-log"); ul.innerHTML = "";
+    if (!c.log || !c.log.length) { var li = document.createElement("li"); li.textContent = "No activity yet."; ul.appendChild(li); return; }
+    c.log.slice().reverse().forEach(function (entry) {
+      var li = document.createElement("li");
+      if (entry.html) {
+        li.innerHTML = '<span class="who">' + esc(entry.text || "💬") + '</span> <span class="comment-body">' + sanitizeCommentHTML(entry.html) + '</span> · ' + fmtDateTime(entry.at);
+      } else {
+        li.innerHTML = '<span class="who">' + esc(entry.text) + '</span> · ' + fmtDateTime(entry.at);
+      }
+      ul.appendChild(li);
+    });
+  }
+  function addLog(c, text) { (c.log = c.log || []).push({ text: text, at: now() }); }
+
+  function parseLabels(s) { return s.split(",").map(function (x) { return x.trim(); }).filter(Boolean); }
+
+  // --- attachments ---
+  function renderAttachList() {
+    var ul = byId("f-attach-list"); ul.innerHTML = "";
+    draftAttachments.forEach(function (a) {
+      var li = el("li", "attach-item");
+      if (a.kind === "link") {
+        var ic = el("span", "ic"); ic.textContent = "🔗"; li.appendChild(ic);
+        var nm = el("span", "a-name");
+        var link = document.createElement("a");
+        link.href = a.url; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = a.name || a.url;
+        nm.appendChild(link); li.appendChild(nm);
+      } else if (a.mime && a.mime.indexOf("image/") === 0) {
+        var img = document.createElement("img"); img.className = "thumb"; img.src = a.data; img.alt = a.name; li.appendChild(img);
+        var nmi = el("span", "a-name");
+        var al = document.createElement("a"); al.href = a.data; al.target = "_blank"; al.rel = "noopener noreferrer"; al.textContent = a.name; nmi.appendChild(al);
+        li.appendChild(nmi);
+        var sz = el("span", "a-size"); sz.textContent = fmtBytes(a.size); li.appendChild(sz);
+      } else {
+        var ic2 = el("span", "ic"); ic2.textContent = "📄"; li.appendChild(ic2);
+        var nm2 = el("span", "a-name");
+        var al2 = document.createElement("a"); al2.href = a.data; al2.download = a.name; al2.textContent = a.name; nm2.appendChild(al2);
+        li.appendChild(nm2);
+        var sz2 = el("span", "a-size"); sz2.textContent = fmtBytes(a.size); li.appendChild(sz2);
+      }
+      var del = el("button", "a-del"); del.innerHTML = "&times;"; del.title = "Remove";
+      del.addEventListener("click", function () {
+        draftAttachments = draftAttachments.filter(function (x) { return x.id !== a.id; });
+        renderAttachList(); saveNow();
+      });
+      li.appendChild(del);
+      ul.appendChild(li);
+    });
+  }
+  function fmtBytes(b) {
+    if (!b && b !== 0) return "";
+    if (b < 1024) return b + " B";
+    if (b < 1024 * 1024) return (b / 1024).toFixed(0) + " KB";
+    return (b / 1024 / 1024).toFixed(1) + " MB";
+  }
+  function addFiles(fileList) {
+    [].slice.call(fileList).forEach(function (file) {
+      if (file.size > MAX_ATTACH_BYTES) {
+        alert('"' + file.name + '" is ' + fmtBytes(file.size) + ". Files must be under " + fmtBytes(MAX_ATTACH_BYTES) + " because attachments are saved in your browser.");
+        return;
+      }
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        draftAttachments.push({ id: uid(), kind: "file", name: file.name, mime: file.type, size: file.size, data: e.target.result });
+        renderAttachList(); saveNow();
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+  function addLink() {
+    var url = byId("f-link-url").value.trim();
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+    draftAttachments.push({ id: uid(), kind: "link", name: url, url: url });
+    byId("f-link-url").value = "";
+    renderAttachList(); saveNow();
+  }
+
+  byId("f-attach-btn").addEventListener("click", function () { byId("f-file-input").click(); });
+  byId("f-file-input").addEventListener("change", function (e) { addFiles(e.target.files); e.target.value = ""; });
+  byId("f-link-btn").addEventListener("click", addLink);
+  byId("f-link-url").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); addLink(); } });
+  var dz = byId("f-dropzone");
+  ["dragenter", "dragover"].forEach(function (ev) {
+    dz.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); dz.classList.add("dragover"); });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    dz.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); dz.classList.remove("dragover"); });
+  });
+  dz.addEventListener("drop", function (e) { if (e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files); });
+
+  // --- linked tickets ---
+  function populateLinkSelect() {
+    var sel = byId("f-linksel");
+    var q = byId("f-linksearch").value.trim().toLowerCase();
+    sel.innerHTML = "";
+    var matches = allTickets().filter(function (t) {
+      if (editingId && t.id === editingId) return false;       // not itself
+      if (draftLinks.indexOf(t.id) !== -1) return false;        // not already linked
+      if (!q) return true;
+      return (t.ticketId + " " + t.title).toLowerCase().indexOf(q) !== -1;
+    });
+    var ph = document.createElement("option");
+    ph.value = ""; ph.textContent = matches.length ? "Select a ticket to link…" : "No matching tickets";
+    sel.appendChild(ph);
+    matches.forEach(function (t) {
+      var o = document.createElement("option");
+      o.value = t.id; o.textContent = t.ticketId + " — " + t.title;
+      sel.appendChild(o);
+    });
+    // if searching narrows to a single result, preselect it so Link works in one click
+    if (q && matches.length === 1) sel.value = matches[0].id;
+  }
+  function renderLinkedList() {
+    populateLinkSelect();
+    var ul = byId("f-linked-list"); ul.innerHTML = "";
+    draftLinks.forEach(function (lid) {
+      var t = findCard(lid); if (!t) return;
+      var li = el("li", "linked-item");
+      var idEl = el("span", "l-id"); idEl.textContent = t.ticketId; li.appendChild(idEl);
+      var title = el("span", "l-title"); title.textContent = t.title;
+      title.addEventListener("click", function () { closeModal(); openModal(t.id, t.status); });
+      li.appendChild(title);
+      var tag = el("span", "status-tag " + t.status); tag.textContent = STATUS_TITLE[t.status]; li.appendChild(tag);
+      var del = el("button", "l-del"); del.innerHTML = "&times;"; del.title = "Unlink";
+      del.addEventListener("click", function () {
+        draftLinks = draftLinks.filter(function (x) { return x !== lid; });
+        renderLinkedList(); saveNow();
+      });
+      li.appendChild(del);
+      ul.appendChild(li);
+    });
+  }
+  byId("f-link-add").addEventListener("click", function () {
+    var v = byId("f-linksel").value;
+    if (v && draftLinks.indexOf(v) === -1) { draftLinks.push(v); byId("f-linksearch").value = ""; renderLinkedList(); saveNow(); }
+  });
+  byId("f-linksearch").addEventListener("input", populateLinkSelect);
+  byId("f-linksearch").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); byId("f-link-add").click(); }
+  });
+
+  // keep both sides of a link in sync after a ticket is saved
+  function reconcileLinks(selfId, before, after) {
+    before.forEach(function (oid) {
+      if (after.indexOf(oid) === -1) {
+        var o = findCard(oid); if (o && o.links) o.links = o.links.filter(function (x) { return x !== selfId; });
+      }
+    });
+    after.forEach(function (oid) {
+      var o = findCard(oid); if (o) { o.links = o.links || []; if (o.links.indexOf(selfId) === -1) o.links.push(selfId); }
+    });
+  }
+
+  // --- auto-save (no Save button) ---
+  // Persists the open ticket whenever a field changes. A brand-new ticket is
+  // created the moment a title is typed; from then on every edit is saved live.
+  var saveTimer = null;
+  function flashSaved() {
+    var s = byId("m-saved"); if (!s) return;
+    s.classList.add("show");
+    clearTimeout(s._t); s._t = setTimeout(function () { s.classList.remove("show"); }, 1100);
+  }
+  function commitCard() {
+    if (!overlay.classList.contains("open")) return;
+    var title = F.title.value.trim();
+    var c = editingId ? findCard(editingId) : null;
+    if (!title) { if (c) showTitleError(); return; } // never wipe a saved title; nothing to create yet
+    clearTitleError();
+    var newStatus = F.status.value;
+
+    if (c) {
+      c.title = title; c.desc = getDesc(); c.priority = F.priority.value;
+      c.due = F.due.value;
+      c.labels = parseLabels(F.labels.value); c.epic = F.epic.value.trim();
+      c.attachments = draftAttachments.slice();
+      var prevLinks = (c.links || []).slice();
+      c.links = draftLinks.slice();
+      reconcileLinks(c.id, prevLinks, c.links);
+      if (c.status !== newStatus) {
+        cards[c.status] = cards[c.status].filter(function (x) { return x.id !== c.id; });
+        c.status = newStatus; addLog(c, "moved to " + STATUS_TITLE[newStatus]);
+        cards[newStatus].push(c); editingCol = newStatus;
+      }
+      c.updated = now();
+    } else {
+      c = newTicket({
+        title: title, desc: getDesc(), priority: F.priority.value, status: newStatus,
+        due: F.due.value, labels: parseLabels(F.labels.value), epic: F.epic.value.trim(),
+        attachments: draftAttachments.slice(), links: draftLinks.slice()
+      });
+      addLog(c, "created");
+      cards[newStatus].push(c);
+      reconcileLinks(c.id, [], c.links);
+      editingId = c.id; editingCol = newStatus;
+      // promote the modal from "new" to "edit" mode
+      byId("m-heading").textContent = "Edit ticket";
+      byId("m-id").textContent = c.ticketId;
+      byId("m-delete").style.display = "inline-block";
+      byId("m-comment-section").style.display = "block";
+      byId("m-activity").style.display = "block";
+    }
+    byId("m-timestamps").textContent = "Created " + fmtDateTime(c.created) + " · Updated " + fmtDateTime(c.updated);
+    renderLog(c);
+    persist(); render(); flashSaved();
+  }
+  // expose so attachment/link handlers can trigger a save
+  function saveNow() { commitCard(); }
+  function saveDebounced() { clearTimeout(saveTimer); saveTimer = setTimeout(commitCard, 400); }
+
+  // text inputs save shortly after you stop typing; selects/date save instantly
+  [F.title, F.desc, F.labels].forEach(function (input) { input.addEventListener("input", saveDebounced); });
+  [F.priority, F.status, F.due].forEach(function (input) { input.addEventListener("change", saveNow); });
+
+  byId("m-comment-btn").addEventListener("click", function () {
+    var c = editingId ? findCard(editingId) : null; if (!c) return;
+    var html = sanitizeCommentHTML(F.comment.innerHTML);
+    if (!stripHTML(html).trim() && html.indexOf("<a ") === -1) return;
+    (c.log = c.log || []).push({ text: "💬", html: html, at: now() });
+    c.updated = now(); F.comment.innerHTML = "";
+    persist(); renderLog(c);
+    byId("m-timestamps").textContent = "Created " + fmtDateTime(c.created) + " · Updated " + fmtDateTime(c.updated);
+  });
+  // Toolbar formatting buttons (bold, italic, lists, links…)
+  byId("f-comment-toolbar").addEventListener("mousedown", function (e) {
+    var b = e.target.closest(".ct-btn"); if (!b) return;
+    e.preventDefault();               // keep focus/selection in the editor
+    F.comment.focus();
+    var cmd = b.getAttribute("data-cmd");
+    if (cmd === "createLink") {
+      var url = prompt("Link URL:", "https://");
+      if (url) { try { new URL(url); } catch (err) { url = "https://" + url.replace(/^https?:\/\//, ""); } document.execCommand("createLink", false, url); }
+    } else {
+      document.execCommand(cmd, false, null);
+    }
+    updateToolbarState();
+  });
+  ["keyup", "mouseup", "input", "focus"].forEach(function (ev) {
+    F.comment.addEventListener(ev, updateToolbarState);
+  });
+  // Ctrl/Cmd+Enter posts the comment (plain Enter makes a new line)
+  F.comment.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); byId("m-comment-btn").click(); }
+  });
+  function updateToolbarState() {
+    ["bold", "italic", "underline", "insertUnorderedList", "insertOrderedList"].forEach(function (cmd) {
+      var btn = document.querySelector('#f-comment-toolbar .ct-btn[data-cmd="' + cmd + '"]');
+      if (!btn) return;
+      var on = false; try { on = document.queryCommandState(cmd); } catch (err) {}
+      btn.classList.toggle("active", on);
+    });
+  }
+  // Keep only safe formatting tags so stored comments render predictably
+  function sanitizeCommentHTML(html) {
+    var allowed = { B: 1, STRONG: 1, I: 1, EM: 1, U: 1, A: 1, UL: 1, OL: 1, LI: 1, BR: 1, P: 1, DIV: 1, SPAN: 1 };
+    var wrap = document.createElement("div"); wrap.innerHTML = html;
+    (function clean(node) {
+      var kids = Array.prototype.slice.call(node.childNodes);
+      kids.forEach(function (n) {
+        if (n.nodeType === 1) {
+          if (!allowed[n.tagName]) {
+            while (n.firstChild) node.insertBefore(n.firstChild, n);
+            node.removeChild(n); return;
+          }
+          Array.prototype.slice.call(n.attributes).forEach(function (a) {
+            if (n.tagName === "A" && a.name === "href") {
+              if (!/^https?:|^mailto:/i.test(a.value)) n.removeAttribute("href");
+            } else { n.removeAttribute(a.name); }
+          });
+          if (n.tagName === "A") { n.setAttribute("target", "_blank"); n.setAttribute("rel", "noopener noreferrer"); }
+          clean(n);
+        } else if (n.nodeType !== 3) { node.removeChild(n); }
+      });
+    })(wrap);
+    return wrap.innerHTML;
+  }
+
+  byId("m-delete").addEventListener("click", function () {
+    if (!editingId) return;
+    var c = findCard(editingId); if (!c) return;
+    confirmDelete("Ticket " + c.ticketId + ' "' + c.title + '" will be permanently deleted. This cannot be undone.', function () {
+      cards[c.status] = cards[c.status].filter(function (x) { return x.id !== c.id; });
+      purgeLinksTo(c.id);
+      persist(); render(); closeModal();
+    });
+  });
+  // Close only when the mouse is both pressed AND released on the backdrop.
+  // This stops a text-selection drag that ends outside the box from closing the modal.
+  function backdropClose(overlayEl, closeFn) {
+    var downOnSelf = false;
+    overlayEl.addEventListener("mousedown", function (e) { downOnSelf = (e.target === overlayEl); });
+    overlayEl.addEventListener("click", function (e) { if (e.target === overlayEl && downOnSelf) closeFn(); downOnSelf = false; });
+  }
+
+  byId("m-cancel").addEventListener("click", closeModal);
+  backdropClose(overlay, closeModal);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && overlay.classList.contains("open")) closeModal(); });
+
+  // --- epics ---
+  function renderEpics() {
+    var listEl = byId("epics-list"), countEl = byId("epics-count"), filterEl = byId("epic-filter");
+    var q = (filterEl ? filterEl.value.trim().toLowerCase() : "");
+    // only surface the filter + count + scroll once the list gets long
+    var many = epics.length > 8;
+    if (filterEl) filterEl.style.display = many ? "" : "none";
+    if (countEl) countEl.style.display = many ? "" : "none";
+    listEl.classList.toggle("scroll", many);
+    listEl.innerHTML = "";
+    if (!epics.length) {
+      if (countEl) countEl.textContent = "";
+      var empty = el("span", "epics-empty");
+      empty.textContent = "No epics yet — create one to group your tickets.";
+      listEl.appendChild(empty);
+      return;
+    }
+    var shown = epics.filter(function (ep) { return !q || ep.name.toLowerCase().indexOf(q) !== -1; });
+    if (countEl) countEl.textContent = q
+      ? (shown.length + " of " + epics.length + " epics")
+      : (epics.length + (epics.length === 1 ? " epic" : " epics"));
+    if (!shown.length) {
+      var none = el("span", "epics-empty");
+      none.textContent = 'No epics match “' + q + '”.';
+      listEl.appendChild(none);
+      return;
+    }
+    shown.forEach(function (ep) {
+      var prog = epicProgress(ep.id);
+      var pill = el("span", "epic-pill");
+      pill.title = "View epic details";
+      var nm = el("span", "ep-name"); nm.textContent = ep.name; pill.appendChild(nm);
+      var track = el("span", "ep-track");
+      var fill = el("span", "ep-fill"); fill.style.width = (prog.total ? prog.pct : 0) + "%"; fill.style.background = ep.color;
+      track.appendChild(fill); pill.appendChild(track);
+      var pct = el("span", "pct"); pct.textContent = (prog.total ? prog.pct : 0) + "%"; pill.appendChild(pct);
+      var x = el("span", "x"); x.innerHTML = "&times;"; x.title = "Delete epic";
+      x.addEventListener("click", function (e) { e.stopPropagation(); deleteEpic(ep.id); });
+      pill.addEventListener("click", function () { openEpicDetail(ep.id); });
+      pill.appendChild(x);
+      listEl.appendChild(pill);
+    });
+  }
+
+  // tickets linked to an epic, across all columns
+  function epicTickets(eid) {
+    var out = [];
+    COLUMNS.forEach(function (col) {
+      (cards[col.id] || []).forEach(function (c) { if (c.epic === eid) out.push(c); });
+    });
+    return out;
+  }
+  function epicProgress(eid) {
+    var ts = epicTickets(eid);
+    var by = { todo: 0, progress: 0, blocked: 0, done: 0 };
+    ts.forEach(function (t) { by[t.status] = (by[t.status] || 0) + 1; });
+    var total = ts.length;
+    var pct = total ? Math.round((by.done / total) * 100) : 0;
+    return { total: total, by: by, pct: pct, tickets: ts };
+  }
+
+  function deleteEpic(eid) {
+    var ep = findEpic(eid); if (!ep) return;
+    confirmDelete('The epic "' + ep.name + '" will be deleted. Tickets in it will keep their other details but lose the epic tag.', function () {
+      epics = epics.filter(function (e) { return e.id !== eid; });
+      Object.keys(cards).forEach(function (k) {
+        (cards[k] || []).forEach(function (c) { if (c.epic === eid) { c.epic = ""; c.updated = now(); } });
+      });
+      persistEpics(); persist(); renderEpics(); render();
+    });
+  }
+
+  // --- epic combobox: search existing epics or create a new one inline ---
+  var epicInput = byId("f-epic-input"), epicMenu = byId("epic-menu"), epicHidden = byId("f-epic");
+  var epicComboItems = [], epicActive = -1;
+
+  function epicNameById(id) { var e = findEpic(id); return e ? e.name : ""; }
+  function setEpicValue(id) {
+    epicHidden.value = id || "";
+    epicInput.value = id ? epicNameById(id) : "";
+  }
+  // kept name so openModal stays unchanged
+  function populateEpicSelect(selectedId) { setEpicValue(selectedId || ""); closeEpicMenu(); }
+
+  function buildEpicMenu() {
+    var q = epicInput.value.trim(), ql = q.toLowerCase();
+    epicMenu.innerHTML = ""; epicComboItems = []; epicActive = -1;
+    addEpicOpt({ type: "none", label: "— None —" });
+    epics.filter(function (ep) { return !ql || ep.name.toLowerCase().indexOf(ql) !== -1; })
+         .forEach(function (ep) { addEpicOpt({ type: "epic", id: ep.id, label: ep.name, color: ep.color }); });
+    var exact = epics.some(function (ep) { return ep.name.toLowerCase() === ql; });
+    if (q && !exact) addEpicOpt({ type: "create", label: '+ Create “' + q + '”', name: q });
+    renderEpicActive();
+  }
+  function addEpicOpt(item) {
+    var idx = epicComboItems.length;
+    var cls = "combo-opt" + (item.type === "create" ? " combo-create" : item.type === "none" ? " combo-none" : "");
+    var opt = el("div", cls);
+    if (item.type === "epic") { var dot = el("span", "combo-dot"); dot.style.background = item.color; opt.appendChild(dot); }
+    var txt = el("span", "combo-txt"); txt.textContent = item.label; opt.appendChild(txt);
+    if (item.type === "epic" && item.id === epicHidden.value) { var ck = el("span", "combo-check"); ck.textContent = "✓"; opt.appendChild(ck); }
+    opt.addEventListener("mousedown", function (e) { e.preventDefault(); chooseEpicOpt(item); });
+    opt.addEventListener("mousemove", function () { epicActive = idx; renderEpicActive(); });
+    epicMenu.appendChild(opt); epicComboItems.push(item);
+  }
+  function renderEpicActive() {
+    [].slice.call(epicMenu.children).forEach(function (c, i) { c.classList.toggle("active", i === epicActive); });
+  }
+  function chooseEpicOpt(item) {
+    if (item.type === "none") setEpicValue("");
+    else if (item.type === "epic") setEpicValue(item.id);
+    else if (item.type === "create") {
+      var ep = { id: uid(), name: item.name, description: "", color: EPIC_COLORS[epics.length % EPIC_COLORS.length], status: "active" };
+      epics.push(ep); persistEpics(); renderEpics();
+      setEpicValue(ep.id);
+    }
+    closeEpicMenu(); saveNow();
+  }
+  function openEpicMenu() { buildEpicMenu(); epicMenu.classList.add("open"); }
+  function closeEpicMenu() { epicMenu.classList.remove("open"); epicActive = -1; }
+  function scrollEpicActive() { var a = epicMenu.children[epicActive]; if (a && a.scrollIntoView) a.scrollIntoView({ block: "nearest" }); }
+
+  epicInput.addEventListener("focus", openEpicMenu);
+  epicInput.addEventListener("input", openEpicMenu);
+  epicInput.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowDown") { e.preventDefault(); if (!epicMenu.classList.contains("open")) openEpicMenu(); epicActive = Math.min(epicActive + 1, epicComboItems.length - 1); renderEpicActive(); scrollEpicActive(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); epicActive = Math.max(epicActive - 1, 0); renderEpicActive(); scrollEpicActive(); }
+    else if (e.key === "Enter") { if (epicMenu.classList.contains("open")) { e.preventDefault(); var it = epicComboItems[epicActive >= 0 ? epicActive : 1] || epicComboItems[0]; if (it) chooseEpicOpt(it); } }
+    else if (e.key === "Escape") { if (epicMenu.classList.contains("open")) { e.preventDefault(); e.stopPropagation(); closeEpicMenu(); setEpicValue(epicHidden.value); } }
+  });
+  epicInput.addEventListener("blur", function () { setTimeout(function () { closeEpicMenu(); setEpicValue(epicHidden.value); }, 120); });
+
+  // epic modal
+  var epicOverlay = byId("epic-overlay");
+  var pickedColor = EPIC_COLORS[0];
+  function buildSwatches() {
+    var wrap = byId("e-swatches"); wrap.innerHTML = "";
+    EPIC_COLORS.forEach(function (col) {
+      var s = el("span", "swatch" + (col === pickedColor ? " sel" : ""));
+      s.style.background = col;
+      s.addEventListener("click", function () {
+        pickedColor = col;
+        [].slice.call(wrap.children).forEach(function (c) { c.classList.remove("sel"); });
+        s.classList.add("sel");
+      });
+      wrap.appendChild(s);
+    });
+  }
+  function openEpicModal() {
+    pickedColor = EPIC_COLORS[0];
+    byId("e-name").value = ""; byId("e-desc").value = "";
+    byId("e-name-error").classList.remove("show"); byId("e-name").classList.remove("invalid");
+    buildSwatches();
+    epicOverlay.classList.add("open");
+    byId("e-name").focus();
+  }
+  function closeEpicModal() { epicOverlay.classList.remove("open"); }
+
+  byId("new-epic-btn").addEventListener("click", openEpicModal);
+  byId("epic-filter").addEventListener("input", renderEpics);
+  byId("e-cancel").addEventListener("click", closeEpicModal);
+  backdropClose(epicOverlay, closeEpicModal);
+  byId("e-name").addEventListener("input", function () { byId("e-name-error").classList.remove("show"); byId("e-name").classList.remove("invalid"); });
+  byId("e-save").addEventListener("click", function () {
+    var name = byId("e-name").value.trim();
+    if (!name) { byId("e-name-error").classList.add("show"); byId("e-name").classList.add("invalid"); byId("e-name").focus(); return; }
+    epics.push({ id: uid(), name: name, description: byId("e-desc").value.trim(), color: pickedColor, status: "active" });
+    persistEpics(); renderEpics(); closeEpicModal();
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && epicOverlay.classList.contains("open")) closeEpicModal(); });
+
+  // epic detail modal
+  var edOverlay = byId("epic-detail-overlay");
+  var STATUS_ORDER = ["todo", "progress", "blocked", "done"];
+  function openEpicDetail(eid) {
+    var ep = findEpic(eid); if (!ep) return;
+    var prog = epicProgress(eid);
+
+    byId("ed-dot").style.background = ep.color;
+    byId("ed-title").textContent = ep.name;
+    byId("ed-desc").textContent = ep.description || "No description.";
+
+    byId("ed-pct").textContent = prog.total ? prog.pct + "% complete" : "No tickets yet";
+    byId("ed-counts").textContent = prog.total ? (prog.by.done + " of " + prog.total + " done") : "";
+    byId("ed-fill").style.width = prog.pct + "%";
+    byId("ed-fill").style.background = ep.color;
+
+    var legend = byId("ed-legend"); legend.innerHTML = "";
+    STATUS_ORDER.forEach(function (s) {
+      var lg = el("span", "lg");
+      var sw = el("span", "sw"); sw.style.background = statusColor(s); lg.appendChild(sw);
+      lg.appendChild(document.createTextNode(STATUS_TITLE[s] + ": " + (prog.by[s] || 0)));
+      legend.appendChild(lg);
+    });
+
+    var ul = byId("ed-tickets"); ul.innerHTML = "";
+    if (!prog.total) {
+      var empty = el("li", "ed-empty"); empty.textContent = "No tickets are linked to this epic yet. Assign this epic when creating or editing a ticket.";
+      ul.appendChild(empty);
+    } else {
+      // group by status order
+      STATUS_ORDER.forEach(function (s) {
+        prog.tickets.filter(function (t) { return t.status === s; }).forEach(function (t) {
+          var li = el("li", "ed-ticket");
+          var id = el("span", "et-id"); id.textContent = t.ticketId; li.appendChild(id);
+          var title = el("span", "et-title"); title.textContent = t.title; li.appendChild(title);
+          var tag = el("span", "status-tag " + t.status); tag.textContent = STATUS_TITLE[t.status]; li.appendChild(tag);
+          var unlink = el("button", "et-unlink"); unlink.innerHTML = "&times;"; unlink.title = "Remove from this epic";
+          unlink.addEventListener("click", function (e) {
+            e.stopPropagation();
+            confirmDelete("Ticket " + t.ticketId + ' "' + t.title + '" will be removed from this epic. The ticket itself will not be deleted.', function () {
+              t.epic = ""; t.updated = now(); addLog(t, "removed from epic");
+              persist(); render(); openEpicDetail(eid); // refresh the open view
+            }, "Remove from epic?");
+          });
+          li.appendChild(unlink);
+          li.addEventListener("click", function () { closeEpicDetail(); openModal(t.id, t.status); });
+          ul.appendChild(li);
+        });
+      });
+    }
+    edOverlay.classList.add("open");
+  }
+  function closeEpicDetail() { edOverlay.classList.remove("open"); }
+  function statusColor(s) {
+    return { todo: "#6366f1", progress: "#f59e0b", blocked: "#ef4444", done: "#10b981" }[s] || "#ccc";
+  }
+  byId("ed-close").addEventListener("click", closeEpicDetail);
+  backdropClose(edOverlay, closeEpicDetail);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && edOverlay.classList.contains("open")) closeEpicDetail(); });
+
+  // confirm modal wiring
+  var confirmOverlay = byId("confirm-overlay");
+  function closeConfirm() { confirmOverlay.classList.remove("open"); _confirmCb = null; }
+  byId("c-cancel").addEventListener("click", closeConfirm);
+  backdropClose(confirmOverlay, closeConfirm);
+  byId("c-confirm").addEventListener("click", function () {
+    var cb = _confirmCb; closeConfirm(); if (cb) cb();
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && confirmOverlay.classList.contains("open")) closeConfirm(); });
+
+  // filter controls
+  ["flt-priority", "flt-epic", "flt-label"].forEach(function (id) {
+    byId(id).addEventListener("change", render);
+  });
+  byId("flt-search").addEventListener("input", render);
+  byId("flt-clear").addEventListener("click", function () {
+    byId("flt-search").value = "";
+    ["flt-priority", "flt-epic", "flt-label"].forEach(function (id) { byId(id).value = ""; });
+    render();
+  });
+
+  // --- notes (multi-note: subjects, priority, rich text, checklists) ---
+  var STORE_NOTES2 = "vytzone.notes.v2";
+  var PRIO_RANK = { urgent: 4, high: 3, medium: 2, low: 1, "": 0 };
+  var notesData = loadNotes();
+  var activeNoteId = null;
+  var noteSaveTimer = null;
+
+  function loadNotes() {
+    var v2 = load(STORE_NOTES2, null);
+    if (v2 && Array.isArray(v2)) return v2;
+    // migrate the old single text note, if any
+    var old = load(STORE_NOTES, "");
+    var arr = [];
+    if (old && old.trim()) {
+      arr.push({ id: uid(), subject: "General Notes", priority: "", body: esc(old).replace(/\n/g, "<br>"), created: now(), updated: now() });
+      save(STORE_NOTES2, arr);
+    }
+    return arr;
+  }
+  function persistNotes() { save(STORE_NOTES2, notesData); }
+  function findNote(id) { for (var i = 0; i < notesData.length; i++) if (notesData[i].id === id) return notesData[i]; return null; }
+
+  function noteTodoCounts(html) {
+    var d = document.createElement("div"); d.innerHTML = html || "";
+    var boxes = d.querySelectorAll('input[type=checkbox]');
+    var done = 0; boxes.forEach(function (b) { if (b.hasAttribute("checked")) done++; });
+    return { total: boxes.length, done: done };
+  }
+
+  function renderNoteList() {
+    var ul = byId("note-list"); ul.innerHTML = "";
+    var q = byId("note-search").value.trim().toLowerCase();
+    var sort = byId("note-sort").value;
+    var items = notesData.filter(function (n) {
+      if (!q) return true;
+      return (n.subject || "").toLowerCase().indexOf(q) !== -1 || stripHTML(n.body || "").toLowerCase().indexOf(q) !== -1;
+    });
+    items.sort(function (a, b) {
+      if (sort === "subject") return (a.subject || "").toLowerCase().localeCompare((b.subject || "").toLowerCase());
+      if (sort === "created") return (b.created || "").localeCompare(a.created || "");
+      if (sort === "priority") { var d = (PRIO_RANK[b.priority] || 0) - (PRIO_RANK[a.priority] || 0); return d !== 0 ? d : (b.updated || "").localeCompare(a.updated || ""); }
+      return (b.updated || "").localeCompare(a.updated || ""); // updated (default)
+    });
+    if (!items.length) {
+      var em = el("li", "note-list-empty");
+      em.textContent = notesData.length ? "No notes match your search." : "No notes yet. Create one!";
+      ul.appendChild(em); return;
+    }
+    items.forEach(function (n) {
+      var li = el("li", "note-list-item" + (n.id === activeNoteId ? " active" : ""));
+      var top = el("div", "nli-top");
+      var title = el("span", "nli-title" + ((n.subject || "").trim() ? "" : " untitled"));
+      title.textContent = (n.subject || "").trim() || "Untitled note";
+      top.appendChild(title);
+      if (n.priority) { var pr = el("span", "badge " + n.priority); pr.textContent = cap(n.priority); top.appendChild(pr); }
+      li.appendChild(top);
+      var preview = stripHTML(n.body || "").replace(/\s+/g, " ").trim();
+      if (preview) { var pv = el("div", "nli-preview"); pv.textContent = preview; li.appendChild(pv); }
+      var foot = el("div", "nli-foot");
+      var dt = el("span", "nli-date"); dt.textContent = fmtDateTime(n.updated); foot.appendChild(dt);
+      var tc = noteTodoCounts(n.body);
+      if (tc.total) { var tg = el("span", "nli-todo"); tg.textContent = "☑ " + tc.done + "/" + tc.total; foot.appendChild(tg); }
+      li.appendChild(foot);
+      li.addEventListener("click", function () { openNote(n.id); });
+      ul.appendChild(li);
+    });
+  }
+
+  function openNote(id) {
+    var n = findNote(id); if (!n) return;
+    activeNoteId = id;
+    byId("note-subject").value = n.subject || "";
+    byId("note-priority").value = n.priority || "";
+    byId("note-body").innerHTML = sanitizeNoteHTML(n.body || "");
+    syncTodoClasses();
+    setNoteMeta(n, false);
+    byId("note-overlay").classList.add("open");
+    autosizeSubject(); // measure after the modal is visible
+    renderNoteList();
+  }
+  function closeNote() {
+    if (activeNoteId) saveActiveNote(); // flush any pending edits
+    byId("note-overlay").classList.remove("open");
+    activeNoteId = null;
+    renderNoteList();
+  }
+
+  function newNote() {
+    var n = { id: uid(), subject: "", priority: "", body: "", created: now(), updated: now() };
+    notesData.unshift(n); persistNotes();
+    openNote(n.id);
+    byId("note-subject").focus();
+  }
+
+  function deleteActiveNote() {
+    if (!activeNoteId) return;
+    confirmDelete("This note will be permanently deleted. This cannot be undone.", function () {
+      notesData = notesData.filter(function (n) { return n.id !== activeNoteId; });
+      activeNoteId = null; persistNotes();
+      byId("note-overlay").classList.remove("open");
+      renderNoteList();
+    });
+  }
+
+  function setNoteMeta(n, justSaved) {
+    byId("note-meta").innerHTML = (justSaved ? '<span class="meta-saved">Saved ✓</span> · ' : "") +
+      "Updated " + esc(fmtDateTime(n.updated)) + " · Created " + esc(fmtDateTime(n.created));
+  }
+
+  function saveActiveNote() {
+    if (!activeNoteId) return;
+    var n = findNote(activeNoteId); if (!n) return;
+    n.subject = byId("note-subject").value;
+    n.priority = byId("note-priority").value;
+    n.body = sanitizeNoteHTML(byId("note-body").innerHTML);
+    n.updated = now();
+    persistNotes(); renderNoteList(); setNoteMeta(n, true);
+  }
+  function saveActiveNoteDebounced() { clearTimeout(noteSaveTimer); noteSaveTimer = setTimeout(saveActiveNote, 400); }
+
+  function syncTodoClasses() {
+    byId("note-body").querySelectorAll(".todo").forEach(function (row) {
+      var cb = row.querySelector('input[type=checkbox]');
+      row.classList.toggle("done", !!(cb && cb.checked));
+    });
+  }
+
+  // sanitizer that also allows checklist items (checkbox inputs + .todo wrappers)
+  function sanitizeNoteHTML(html) {
+    var allowed = { B: 1, STRONG: 1, I: 1, EM: 1, U: 1, A: 1, UL: 1, OL: 1, LI: 1, BR: 1, P: 1, DIV: 1, SPAN: 1, INPUT: 1, H1: 1, H2: 1, H3: 1 };
+    var keepClass = { todo: 1, "todo-text": 1, done: 1 };
+    var wrap = document.createElement("div"); wrap.innerHTML = html;
+    (function clean(node) {
+      Array.prototype.slice.call(node.childNodes).forEach(function (n) {
+        if (n.nodeType === 1) {
+          if (!allowed[n.tagName]) { while (n.firstChild) node.insertBefore(n.firstChild, n); node.removeChild(n); return; }
+          if (n.tagName === "INPUT") {
+            if ((n.getAttribute("type") || "").toLowerCase() !== "checkbox") { node.removeChild(n); return; }
+            var wasChecked = n.hasAttribute("checked") || n.checked;
+            Array.prototype.slice.call(n.attributes).forEach(function (a) { n.removeAttribute(a.name); });
+            n.setAttribute("type", "checkbox"); if (wasChecked) n.setAttribute("checked", "checked");
+            return;
+          }
+          var cls = (n.getAttribute("class") || "").split(/\s+/).filter(function (c) { return keepClass[c]; }).join(" ");
+          var href = (n.tagName === "A") ? n.getAttribute("href") : null;
+          Array.prototype.slice.call(n.attributes).forEach(function (a) { n.removeAttribute(a.name); });
+          if (cls) n.setAttribute("class", cls);
+          if (n.tagName === "A" && href && /^https?:|^mailto:/i.test(href)) {
+            n.setAttribute("href", href); n.setAttribute("target", "_blank"); n.setAttribute("rel", "noopener noreferrer");
+          }
+          clean(n);
+        } else if (n.nodeType !== 3) { node.removeChild(n); }
+      });
+    })(wrap);
+    return wrap.innerHTML;
+  }
+
+  // Thorough "clear formatting": strips bold/italic/etc, removes links,
+  // turns bullet/numbered lists back into plain lines, and demotes headings.
+  function clearFormatting() {
+    document.execCommand("removeFormat", false, null);
+    document.execCommand("unlink", false, null);
+    try { if (document.queryCommandState("insertUnorderedList")) document.execCommand("insertUnorderedList", false, null); } catch (e) {}
+    try { if (document.queryCommandState("insertOrderedList")) document.execCommand("insertOrderedList", false, null); } catch (e) {}
+    var blk = ""; try { blk = (document.queryCommandValue("formatBlock") || "").toLowerCase(); } catch (e) {}
+    if (blk === "h1" || blk === "h2" || blk === "h3") document.execCommand("formatBlock", false, "p");
+  }
+
+  function insertNoteCheckbox() {
+    var body = byId("note-body"); body.focus();
+    var sel = window.getSelection(); if (!sel.rangeCount) return;
+    var range = sel.getRangeAt(0); range.deleteContents();
+    var div = document.createElement("div"); div.className = "todo";
+    var cb = document.createElement("input"); cb.type = "checkbox";
+    var sp = document.createElement("span"); sp.className = "todo-text"; sp.innerHTML = " ";
+    div.appendChild(cb); div.appendChild(sp);
+    range.insertNode(div);
+    var r2 = document.createRange(); r2.setStart(sp, 0); r2.collapse(true);
+    sel.removeAllRanges(); sel.addRange(r2);
+    saveActiveNoteDebounced();
+  }
+
+  function createTicketFromNote() {
+    if (!activeNoteId) return;
+    saveActiveNote(); // make sure latest edits are captured
+    var n = findNote(activeNoteId); if (!n) return;
+    var title = (n.subject || "").trim();
+    if (!title) {
+      var txt = stripHTML(n.body || "").replace(/\s+/g, " ").trim();
+      title = txt ? txt.slice(0, 80) : "Untitled note";
+    }
+    var t = newTicket({ title: title, desc: n.body || "", priority: n.priority || "medium", status: "todo" });
+    addLog(t, "created from note");
+    cards.todo.push(t);
+    persist(); render();
+    // jump to the board and open the new ticket for review
+    var boardTab = document.querySelector('.tab[data-view="board"]');
+    if (boardTab) boardTab.click();
+    openModal(t.id, "todo");
+  }
+
+  // --- meeting notes: turn a Granola transcript/summary into a structured note ---
+  function mdInline(s) {
+    // s is already HTML-escaped; turn lightweight markdown into safe inline tags
+    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function (m, t, u) { return '<a href="' + u + '" target="_blank" rel="noopener noreferrer">' + t + '</a>'; });
+    s = s.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/__([^_]+)__/g, "<b>$1</b>");
+    s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<i>$2</i>");
+    s = s.replace(/(^|[\s(])((?:https?:\/\/)[^\s<)]+)/g, function (m, pre, url) { return pre + '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + url + "</a>"; });
+    return s;
+  }
+  function mdToNoteHTML(md) {
+    var lines = String(md).replace(/\r\n/g, "\n").split("\n");
+    var out = [], listType = null;
+    function closeList() { if (listType) { out.push("</" + listType + ">"); listType = null; } }
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].replace(/\s+$/, ""), m;
+      if (!line.trim()) { closeList(); continue; }
+      if ((m = line.match(/^(#{1,3})\s+(.*)$/))) { closeList(); var lvl = m[1].length; out.push("<h" + lvl + ">" + mdInline(esc(m[2])) + "</h" + lvl + ">"); continue; }
+      if ((m = line.match(/^\s*[-*]\s+\[([ xX])\]\s+(.*)$/))) { closeList(); var ck = m[1].toLowerCase() === "x"; out.push('<div class="todo' + (ck ? " done" : "") + '"><input type="checkbox"' + (ck ? " checked" : "") + '><span class="todo-text">' + mdInline(esc(m[2])) + "</span></div>"); continue; }
+      if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) { if (listType !== "ol") { closeList(); out.push("<ol>"); listType = "ol"; } out.push("<li>" + mdInline(esc(m[1])) + "</li>"); continue; }
+      if ((m = line.match(/^\s*[-*]\s+(.*)$/))) { if (listType !== "ul") { closeList(); out.push("<ul>"); listType = "ul"; } out.push("<li>" + mdInline(esc(m[1])) + "</li>"); continue; }
+      closeList(); out.push("<p>" + mdInline(esc(line)) + "</p>");
+    }
+    closeList();
+    return out.join("");
+  }
+  function ticketsFromNoteChecklist(n) {
+    var d = document.createElement("div"); d.innerHTML = n.body || "";
+    var rows = Array.prototype.slice.call(d.querySelectorAll(".todo")).filter(function (row) {
+      var cb = row.querySelector('input[type=checkbox]');
+      if (!cb) return false;                                   // must be a checklist item
+      var checked = cb.checked || cb.hasAttribute("checked");  // treat either as done
+      var tx = row.querySelector(".todo-text");
+      var text = (tx ? tx.textContent : row.textContent).trim();
+      return text && !checked;                                 // only unchecked items become tickets
+    });
+    if (!rows.length) return { made: 0, epic: "" };
+    // group all action items under an epic named after the note subject (reuse if it already exists)
+    var epicName = ((n.subject || "Meeting").trim()) || "Meeting";
+    var ep = null;
+    for (var i = 0; i < epics.length; i++) { if (epics[i].name.toLowerCase() === epicName.toLowerCase()) { ep = epics[i]; break; } }
+    if (!ep) {
+      ep = { id: uid(), name: epicName, description: "Action items from meeting note", color: EPIC_COLORS[epics.length % EPIC_COLORS.length], status: "active" };
+      epics.push(ep); persistEpics();
+    }
+    var made = 0;
+    rows.forEach(function (row) {
+      var tx = row.querySelector(".todo-text");
+      var text = (tx ? tx.textContent : row.textContent).trim();
+      var t = newTicket({ title: text.slice(0, 120), desc: "From meeting note: <b>" + esc(n.subject || "Meeting") + "</b>", priority: "medium", status: "todo", epic: ep.id });
+      addLog(t, "created from meeting note");
+      cards.todo.push(t); made++;
+    });
+    if (made) { persist(); render(); renderEpics(); }
+    return { made: made, epic: epicName };
+  }
+  function openMeeting() {
+    byId("meeting-subject").value = "";
+    byId("meeting-input").value = "";
+    byId("meeting-make-tickets").checked = false;
+    byId("meeting-overlay").classList.add("open");
+    byId("meeting-input").focus();
+  }
+  function closeMeeting() { byId("meeting-overlay").classList.remove("open"); }
+  function createMeetingNote() {
+    var md = byId("meeting-input").value;
+    if (!md.trim()) { byId("meeting-input").focus(); return; }
+    var subject = byId("meeting-subject").value.trim();
+    if (!subject) { var hm = md.match(/^\s*#\s+(.+)$/m); subject = hm ? hm[1].trim() : ("Meeting note — " + fmtDate(now())); }
+    var n = { id: uid(), subject: subject, priority: "", body: sanitizeNoteHTML(mdToNoteHTML(md)), created: now(), updated: now() };
+    notesData.unshift(n); persistNotes();
+    var makeTickets = byId("meeting-make-tickets").checked;
+    closeMeeting();
+    openNote(n.id);
+    if (makeTickets) {
+      var res = ticketsFromNoteChecklist(n);
+      byId("note-meta").innerHTML = '<span class="meta-saved">Created ' + res.made + ' ticket' + (res.made === 1 ? "" : "s") +
+        (res.made ? ' in epic “' + esc(res.epic) + '” ✓' : ' — no open action items found') + '</span>';
+    }
+  }
+  byId("note-meeting").addEventListener("click", openMeeting);
+  byId("meeting-cancel").addEventListener("click", closeMeeting);
+  byId("meeting-create").addEventListener("click", createMeetingNote);
+  backdropClose(byId("meeting-overlay"), closeMeeting);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && byId("meeting-overlay").classList.contains("open")) closeMeeting(); });
+
+  // wiring
+  byId("note-new").addEventListener("click", newNote);
+  byId("note-to-ticket").addEventListener("click", createTicketFromNote);
+  byId("note-delete").addEventListener("click", deleteActiveNote);
+  byId("note-close").addEventListener("click", closeNote);
+  backdropClose(byId("note-overlay"), closeNote);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && byId("note-overlay").classList.contains("open")) closeNote(); });
+  byId("note-search").addEventListener("input", renderNoteList);
+  byId("note-sort").addEventListener("change", renderNoteList);
+  function autosizeSubject() { var s = byId("note-subject"); s.style.height = "auto"; s.style.height = s.scrollHeight + "px"; }
+  byId("note-subject").addEventListener("input", function () { autosizeSubject(); saveActiveNoteDebounced(); });
+  byId("note-subject").addEventListener("keydown", function (e) { if (e.key === "Enter") e.preventDefault(); }); // title stays one line, just wraps
+  byId("note-priority").addEventListener("change", saveActiveNote);
+  byId("note-body").addEventListener("input", saveActiveNoteDebounced);
+
+  byId("note-toolbar").addEventListener("mousedown", function (e) {
+    var b = e.target.closest(".ct-btn"); if (!b) return;
+    e.preventDefault();
+    byId("note-body").focus();
+    var cmd = b.getAttribute("data-cmd");
+    if (cmd === "h1" || cmd === "h2" || cmd === "h3") {
+      var isOn = false; try { isOn = document.queryCommandValue("formatBlock").toLowerCase() === cmd; } catch (err) {}
+      document.execCommand("formatBlock", false, isOn ? "p" : cmd);
+      saveActiveNoteDebounced();
+    }
+    else if (cmd === "checkbox") { insertNoteCheckbox(); }
+    else if (cmd === "createLink") {
+      var url = prompt("Link URL:", "https://");
+      if (url) { try { new URL(url); } catch (err) { url = "https://" + url.replace(/^https?:\/\//, ""); } document.execCommand("createLink", false, url); saveActiveNoteDebounced(); }
+    }
+    else if (cmd === "removeFormat") { clearFormatting(); saveActiveNoteDebounced(); }
+    else { document.execCommand(cmd, false, null); saveActiveNoteDebounced(); }
+    updateNoteToolbarState();
+  });
+  ["keyup", "mouseup", "focus"].forEach(function (ev) { byId("note-body").addEventListener(ev, updateNoteToolbarState); });
+  // toggling a checklist item persists its state
+  byId("note-body").addEventListener("change", function (e) {
+    if (e.target && e.target.type === "checkbox") {
+      if (e.target.checked) e.target.setAttribute("checked", "checked"); else e.target.removeAttribute("checked");
+      var row = e.target.closest(".todo"); if (row) row.classList.toggle("done", e.target.checked);
+      saveActiveNote();
+    }
+  });
+  function updateNoteToolbarState() {
+    ["bold", "italic", "underline", "insertUnorderedList", "insertOrderedList"].forEach(function (cmd) {
+      var btn = document.querySelector('#note-toolbar .ct-btn[data-cmd="' + cmd + '"]');
+      if (!btn) return; var on = false; try { on = document.queryCommandState(cmd); } catch (err) {}
+      btn.classList.toggle("active", on);
+    });
+    var block = ""; try { block = (document.queryCommandValue("formatBlock") || "").toLowerCase(); } catch (err) {}
+    ["h1", "h2", "h3"].forEach(function (h) {
+      var btn = document.querySelector('#note-toolbar .ct-btn[data-cmd="' + h + '"]');
+      if (btn) btn.classList.toggle("active", block === h);
+    });
+  }
+
+  renderNoteList();
+  if (notesData.length) openNote(notesData.slice().sort(function (a, b) { return (b.updated || "").localeCompare(a.updated || ""); })[0].id);
+
+  // helpers
+  function el(tag, cls) { var e = document.createElement(tag); if (cls) e.className = cls; return e; }
+  function byId(i) { return document.getElementById(i); }
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+  function fmtDateTime(iso) { if (!iso) return ""; var d = new Date(iso); return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); }
+
+  renderEpics();
+  render();
+})();
+</script>
+</body>
+</html>
