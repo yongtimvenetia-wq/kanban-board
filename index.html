@@ -1068,7 +1068,8 @@
   // --- modal ---
   var overlay = document.getElementById("overlay");
   var editingId = null, editingCol = null, draftAttachments = [], draftLinks = [];
-  var MAX_ATTACH_BYTES = 3 * 1024 * 1024; // ~3 MB per file (browser storage is limited)
+  var CLOUDINARY_CLOUD = "dam1d4r3h";
+  var CLOUDINARY_PRESET = "kanban";
   var F = {
     title: byId("f-title"), desc: byId("f-desc"), priority: byId("f-priority"),
     status: byId("f-status"), due: byId("f-due"),
@@ -1317,16 +1318,21 @@
         var link = document.createElement("a");
         link.href = a.url; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = a.name || a.url;
         nm.appendChild(link); li.appendChild(nm);
+      } else if (a.uploading) {
+        var ic0 = el("span", "ic"); ic0.textContent = "⏳"; li.appendChild(ic0);
+        var nm0 = el("span", "a-name"); nm0.textContent = a.name + " — uploading…"; li.appendChild(nm0);
       } else if (a.mime && a.mime.indexOf("image/") === 0) {
-        var img = document.createElement("img"); img.className = "thumb"; img.src = a.data; img.alt = a.name; li.appendChild(img);
+        var fileUrl = a.url || a.data;
+        var img = document.createElement("img"); img.className = "thumb"; img.src = fileUrl; img.alt = a.name; li.appendChild(img);
         var nmi = el("span", "a-name");
-        var al = document.createElement("a"); al.href = a.data; al.target = "_blank"; al.rel = "noopener noreferrer"; al.textContent = a.name; nmi.appendChild(al);
+        var al = document.createElement("a"); al.href = fileUrl; al.target = "_blank"; al.rel = "noopener noreferrer"; al.textContent = a.name; nmi.appendChild(al);
         li.appendChild(nmi);
         var sz = el("span", "a-size"); sz.textContent = fmtBytes(a.size); li.appendChild(sz);
       } else {
+        var fileUrl2 = a.url || a.data;
         var ic2 = el("span", "ic"); ic2.textContent = "📄"; li.appendChild(ic2);
         var nm2 = el("span", "a-name");
-        var al2 = document.createElement("a"); al2.href = a.data; al2.download = a.name; al2.textContent = a.name; nm2.appendChild(al2);
+        var al2 = document.createElement("a"); al2.href = fileUrl2; al2.target = "_blank"; al2.rel = "noopener noreferrer"; al2.textContent = a.name; nm2.appendChild(al2);
         li.appendChild(nm2);
         var sz2 = el("span", "a-size"); sz2.textContent = fmtBytes(a.size); li.appendChild(sz2);
       }
@@ -1347,16 +1353,37 @@
   }
   function addFiles(fileList) {
     [].slice.call(fileList).forEach(function (file) {
-      if (file.size > MAX_ATTACH_BYTES) {
-        alert('"' + file.name + '" is ' + fmtBytes(file.size) + ". Files must be under " + fmtBytes(MAX_ATTACH_BYTES) + " because attachments are saved in your browser.");
-        return;
-      }
-      var reader = new FileReader();
-      reader.onload = function (e) {
-        draftAttachments.push({ id: uid(), kind: "file", name: file.name, mime: file.type, size: file.size, data: e.target.result });
+      var attachId = uid();
+      var placeholder = { id: attachId, kind: "file", name: file.name, mime: file.type, size: file.size, uploading: true };
+      draftAttachments.push(placeholder);
+      renderAttachList();
+
+      var fd = new FormData();
+      fd.append("file", file);
+      fd.append("upload_preset", CLOUDINARY_PRESET);
+
+      var xhr = new XMLHttpRequest();
+      xhr.open("POST", "https://api.cloudinary.com/v1_1/" + CLOUDINARY_CLOUD + "/auto/upload");
+      xhr.onload = function () {
+        var idx = -1;
+        for (var i = 0; i < draftAttachments.length; i++) { if (draftAttachments[i].id === attachId) { idx = i; break; } }
+        if (xhr.status === 200) {
+          var res = JSON.parse(xhr.responseText);
+          if (idx !== -1) draftAttachments[idx] = { id: attachId, kind: "file", name: file.name, mime: file.type, size: file.size, url: res.secure_url };
+        } else {
+          if (idx !== -1) draftAttachments.splice(idx, 1);
+          alert("Upload failed for “" + file.name + "”. Please try again.");
+        }
         renderAttachList(); saveNow();
       };
-      reader.readAsDataURL(file);
+      xhr.onerror = function () {
+        var idx = -1;
+        for (var i = 0; i < draftAttachments.length; i++) { if (draftAttachments[i].id === attachId) { idx = i; break; } }
+        if (idx !== -1) draftAttachments.splice(idx, 1);
+        alert("Upload error for “" + file.name + "”. Check your internet connection.");
+        renderAttachList();
+      };
+      xhr.send(fd);
     });
   }
   function addLink() {
