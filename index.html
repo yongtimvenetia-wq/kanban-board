@@ -2167,6 +2167,43 @@
   byId("note-subject").addEventListener("keydown", function (e) { if (e.key === "Enter") e.preventDefault(); }); // title stays one line, just wraps
   byId("note-priority").addEventListener("change", saveActiveNote);
   byId("note-body").addEventListener("input", saveActiveNoteDebounced);
+  // Backspace on an empty checkbox row deletes the whole row in one press
+  byId("note-body").addEventListener("keydown", function (e) {
+    if (e.key !== "Backspace") return;
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    var range = sel.getRangeAt(0);
+    if (!range.collapsed) return;
+    var node = range.startContainer;
+    var todoRow = null;
+    // Find if we're inside a .todo div
+    var check = node.nodeType === Node.TEXT_NODE ? node.parentNode : node;
+    while (check && check !== byId("note-body")) {
+      if (check.classList && check.classList.contains("todo")) { todoRow = check; break; }
+      check = check.parentNode;
+    }
+    if (!todoRow) return;
+    var textSpan = todoRow.querySelector(".todo-text");
+    var isEmpty = !textSpan || textSpan.textContent.trim() === "";
+    var atStart = range.startOffset === 0;
+    if (isEmpty || atStart) {
+      e.preventDefault();
+      var body = byId("note-body");
+      // Place cursor on the line before the todo row
+      var prev = todoRow.previousSibling;
+      todoRow.parentNode.removeChild(todoRow);
+      if (prev) {
+        var r = document.createRange();
+        if (prev.nodeType === Node.TEXT_NODE) {
+          r.setStart(prev, prev.textContent.length); r.collapse(true);
+        } else {
+          r.setStartAfter(prev); r.collapse(true);
+        }
+        sel.removeAllRanges(); sel.addRange(r);
+      }
+      saveActiveNoteDebounced();
+    }
+  });
   // Notion-style shortcut: typing "[] " converts the current line to a checkbox
   byId("note-body").addEventListener("keydown", function (e) {
     if (e.key !== " ") return;
