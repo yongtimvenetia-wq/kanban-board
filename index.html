@@ -2167,6 +2167,36 @@
   byId("note-subject").addEventListener("keydown", function (e) { if (e.key === "Enter") e.preventDefault(); }); // title stays one line, just wraps
   byId("note-priority").addEventListener("change", saveActiveNote);
   byId("note-body").addEventListener("input", saveActiveNoteDebounced);
+  // Notion-style shortcut: typing "[] " converts the current line to a checkbox
+  byId("note-body").addEventListener("keydown", function (e) {
+    if (e.key !== " ") return;
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    var range = sel.getRangeAt(0);
+    if (!range.collapsed) return;
+    var node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE) return;
+    var textBefore = node.textContent.substring(0, range.startOffset);
+    if (textBefore === "[]") {
+      e.preventDefault();
+      var delRange = document.createRange();
+      delRange.setStart(node, 0);
+      delRange.setEnd(node, 2);
+      delRange.deleteContents();
+      insertNoteCheckbox();
+      return;
+    }
+    if (textBefore === "*") {
+      e.preventDefault();
+      var delRange2 = document.createRange();
+      delRange2.setStart(node, 0);
+      delRange2.setEnd(node, 1);
+      delRange2.deleteContents();
+      document.execCommand("insertUnorderedList", false, null);
+      saveActiveNoteDebounced();
+      return;
+    }
+  });
 
   byId("note-toolbar").addEventListener("mousedown", function (e) {
     var b = e.target.closest(".ct-btn"); if (!b) return;
