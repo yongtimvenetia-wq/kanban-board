@@ -1138,40 +1138,42 @@
   });
   // ⌘K / Ctrl+K opens the link popover
   F.desc.addEventListener("keydown", function (e) {
-    if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); openLinkPop(); }
+    if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); openLinkPop(F.desc); }
   });
 
-  var linkPop = byId("link-pop"), savedRange = null;
-  function anchorAtSelection() {
+  var linkPop = byId("link-pop"), savedRange = null, linkPopContext = null;
+  function anchorAtSelection(ctx) {
     var sel = window.getSelection();
     if (!sel || !sel.rangeCount) return null;
     var n = sel.anchorNode;
-    while (n && n !== F.desc) { if (n.nodeName === "A") return n; n = n.parentNode; }
+    while (n && n !== ctx) { if (n.nodeName === "A") return n; n = n.parentNode; }
     return null;
   }
-  function openLinkPop() {
+  function openLinkPop(ctx) {
+    linkPopContext = ctx || F.desc;
     var sel = window.getSelection();
     if (!sel || !sel.rangeCount) return;
     savedRange = sel.getRangeAt(0).cloneRange();
-    var a = anchorAtSelection();
+    var a = anchorAtSelection(linkPopContext);
     byId("lp-url").value = a ? (a.getAttribute("href") || "") : "";
     byId("lp-remove").style.display = a ? "inline-block" : "none";
     var r;
     try { r = savedRange.getBoundingClientRect(); } catch (err) { r = null; }
-    if (!r || (!r.width && !r.height && !r.top)) r = F.desc.getBoundingClientRect();
+    if (!r || (!r.width && !r.height && !r.top)) r = linkPopContext.getBoundingClientRect();
     linkPop.style.display = "block";
     var w = linkPop.offsetWidth || 290, h = linkPop.offsetHeight || 90;
     linkPop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + "px";
     linkPop.style.top = Math.max(8, Math.min((r.bottom || r.top) + 6, window.innerHeight - h - 8)) + "px";
     byId("lp-url").focus(); byId("lp-url").select();
   }
-  function closeLinkPop() { linkPop.style.display = "none"; savedRange = null; }
+  function closeLinkPop() { linkPop.style.display = "none"; savedRange = null; linkPopContext = null; }
   function restoreRange() {
-    if (!savedRange) return;
+    if (!savedRange || !linkPopContext) return;
+    linkPopContext.focus();
     var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(savedRange);
   }
   function normalizeLinks() {
-    [].slice.call(F.desc.querySelectorAll("a")).forEach(function (x) {
+    [].slice.call((linkPopContext || F.desc).querySelectorAll("a")).forEach(function (x) {
       x.target = "_blank"; x.rel = "noopener noreferrer";
       x.title = x.getAttribute("href") + "  (click to open)";
     });
@@ -1180,8 +1182,8 @@
     var url = byId("lp-url").value.trim();
     if (!url) return;
     if (!/^(https?:|mailto:)/i.test(url)) url = "https://" + url;
-    F.desc.focus(); restoreRange();
-    var a = anchorAtSelection();
+    restoreRange();
+    var a = anchorAtSelection(linkPopContext);
     if (a) {
       a.setAttribute("href", url);
     } else if (savedRange && savedRange.collapsed) {
@@ -1193,14 +1195,18 @@
       document.execCommand("createLink", false, url);
     }
     normalizeLinks();
-    closeLinkPop(); saveNow();
+    var isNote = linkPopContext === byId("note-body");
+    closeLinkPop();
+    if (isNote) saveActiveNoteDebounced(); else saveNow();
   }
   function removeLink() {
-    F.desc.focus(); restoreRange();
-    var a = anchorAtSelection();
+    restoreRange();
+    var a = anchorAtSelection(linkPopContext);
     if (a) { var p = a.parentNode; while (a.firstChild) p.insertBefore(a.firstChild, a); p.removeChild(a); }
     else { document.execCommand("unlink"); }
-    closeLinkPop(); saveNow();
+    var isNote = linkPopContext === byId("note-body");
+    closeLinkPop();
+    if (isNote) saveActiveNoteDebounced(); else saveNow();
   }
   byId("lp-apply").addEventListener("click", applyLink);
   byId("lp-remove").addEventListener("click", removeLink);
@@ -1230,7 +1236,7 @@
   }
   function applyCommand(cmd) {
     F.desc.focus(); restoreSel();
-    if (cmd === "link") { openLinkPop(); return; }
+    if (cmd === "link") { openLinkPop(F.desc); return; }
     if (cmd === "quote") {
       var inQuote = parentTag(window.getSelection().anchorNode, "BLOCKQUOTE");
       document.execCommand("formatBlock", false, inQuote ? "p" : "blockquote");
@@ -2204,6 +2210,12 @@
       saveActiveNoteDebounced();
     }
   });
+  // ⌘K / Ctrl+K inserts a link in the note body
+  byId("note-body").addEventListener("keydown", function (e) {
+    if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+      e.preventDefault(); openLinkPop(byId("note-body"));
+    }
+  });
   // Notion-style shortcut: typing "[] " converts the current line to a checkbox
   byId("note-body").addEventListener("keydown", function (e) {
     if (e.key !== " ") return;
@@ -2230,6 +2242,16 @@
       delRange2.setEnd(node, 1);
       delRange2.deleteContents();
       document.execCommand("insertUnorderedList", false, null);
+      saveActiveNoteDebounced();
+      return;
+    }
+    if (/^\d+\.$/.test(textBefore)) {
+      e.preventDefault();
+      var delRange3 = document.createRange();
+      delRange3.setStart(node, 0);
+      delRange3.setEnd(node, textBefore.length);
+      delRange3.deleteContents();
+      document.execCommand("insertOrderedList", false, null);
       saveActiveNoteDebounced();
       return;
     }
