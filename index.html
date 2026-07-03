@@ -2313,21 +2313,19 @@ window.__bootKanban = function () {
 };
 
 /* =====================================================================
-   CLOUD SYNC (Supabase) — makes the board visible across devices.
-   1. Create a free account at https://supabase.com
-   2. New project. Then in the SQL editor run the snippet from the
-      setup guide to create the "kanban_state" table.
-   3. In Project Settings > API, copy the "Project URL" and the
-      "anon public" key, and paste them below.
-   Until you fill these in, the board still works locally on this device.
+   CLOUD SYNC + PASSWORDLESS LOGIN (Supabase magic link)
+   The board is locked behind a login. Enter your email, get a login link,
+   click it, and you're in — no password. Only the signed-in account can
+   read or write its data, and it syncs across every device you log in on.
    ===================================================================== */
 (function () {
   "use strict";
 
   var SUPABASE_URL      = "https://ebamjhuteebmtfxvppfs.supabase.co";
   var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImViYW1qaHV0ZWVibXRmeHZwcGZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxMDEzMjksImV4cCI6MjA5ODY3NzMyOX0.MWsmZY2ImPVkO7GgsxJWNCLciIA3gxnhAQ2wFbaRtWo";
-  var BOARD_ID          = "venetia-main";                  // one shared board; keep as-is
+  var SITE_URL          = "https://yongtimvenetia-wq.github.io/kanban-board/"; // where the login link returns you
 
+  var SESSION_KEY = "vytzone.session.v1";
   var CLOUD_KEYS = [
     "vytzone.tickets.v2",
     "vytzone.notes.v1",
@@ -2339,42 +2337,106 @@ window.__bootKanban = function () {
   var CLOUD_ENABLED = SUPABASE_URL.indexOf("PASTE_") === -1 &&
                       SUPABASE_ANON_KEY.indexOf("PASTE_") === -1;
 
-  function headers(extra) {
-    var h = { "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer " + SUPABASE_ANON_KEY };
+  // ---- session storage ----
+  function getSession() {
+    try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch (e) { return null; }
+  }
+  function setSession(j) {
+    if (!j || !j.access_token) return null;
+    var sess = {
+      access_token: j.access_token,
+      refresh_token: j.refresh_token,
+      expires_at: Math.floor(Date.now() / 1000) + (j.expires_in || 3600),
+      user_id: j.user && j.user.id,
+      email: j.user && j.user.email
+    };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(sess));
+    return sess;
+  }
+  function clearSession() { localStorage.removeItem(SESSION_KEY); }
+
+  function authHeaders(extra) {
+    var s = getSession();
+    var h = { "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer " + (s ? s.access_token : SUPABASE_ANON_KEY) };
     if (extra) for (var k in extra) h[k] = extra[k];
     return h;
   }
 
+  // ---- auth calls ----
+  function authError(j) {
+    return (j && (j.error_description || j.msg || j.error || j.message)) || "Something went wrong. Please try again.";
+  }
+  // Email a one-time login link (creates the account on first use).
+  function sendMagicLink(email) {
+    return fetch(SUPABASE_URL + "/auth/v1/otp?redirect_to=" + encodeURIComponent(SITE_URL), {
+      method: "POST",
+      headers: { "apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email, create_user: true })
+    }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(authError(j)); return true; }); });
+  }
+  // Look up the signed-in user (to learn their id) from an access token.
+  function fetchUser(token) {
+    return fetch(SUPABASE_URL + "/auth/v1/user", {
+      headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer " + token }
+    }).then(function (r) { return r.ok ? r.json() : null; });
+  }
+  // Read tokens the login link puts in the URL (#access_token=...&refresh_token=...).
+  function sessionFromHash() {
+    if (!location.hash) return null;
+    var p = new URLSearchParams(location.hash.slice(1));
+    var at = p.get("access_token");
+    if (!at) return null;
+    return { access_token: at, refresh_token: p.get("refresh_token"), expires_in: parseInt(p.get("expires_in") || "3600", 10) };
+  }
+  function refreshSession() {
+    var s = getSession();
+    if (!s || !s.refresh_token) return Promise.reject(new Error("no session"));
+    return fetch(SUPABASE_URL + "/auth/v1/token?grant_type=refresh_token", {
+      method: "POST",
+      headers: { "apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: s.refresh_token })
+    }).then(function (r) { if (!r.ok) throw new Error("refresh failed"); return r.json(); })
+      .then(function (j) { return setSession(j); });
+  }
+  function ensureFresh() {
+    var s = getSession();
+    if (!s) return Promise.reject(new Error("no session"));
+    if (s.expires_at && (s.expires_at - 60) > Math.floor(Date.now() / 1000)) return Promise.resolve(s);
+    return refreshSession();
+  }
+
+  // ---- data sync (owner-scoped) ----
   function cloudFetch() {
-    var url = SUPABASE_URL + "/rest/v1/kanban_state?id=eq." +
-              encodeURIComponent(BOARD_ID) + "&select=data,updated_at";
-    return fetch(url, { headers: headers() })
+    var s = getSession();
+    if (!s) return Promise.resolve(null);
+    var url = SUPABASE_URL + "/rest/v1/kanban_state?user_id=eq." +
+              encodeURIComponent(s.user_id) + "&select=data,updated_at";
+    function go() { return fetch(url, { headers: authHeaders() }); }
+    return go().then(function (r) { return r.status === 401 ? refreshSession().then(go) : r; })
       .then(function (r) { return r.ok ? r.json() : []; })
       .then(function (rows) { return (rows && rows[0]) ? rows[0] : null; });
   }
-
   function cloudPush() {
-    if (!CLOUD_ENABLED) return Promise.resolve();
+    var s = getSession();
+    if (!CLOUD_ENABLED || !s) return Promise.resolve();
     var data = {};
-    CLOUD_KEYS.forEach(function (k) {
-      var v = localStorage.getItem(k);
-      if (v != null) data[k] = v;
-    });
+    CLOUD_KEYS.forEach(function (k) { var v = localStorage.getItem(k); if (v != null) data[k] = v; });
     var stamp = new Date().toISOString();
-    var body = JSON.stringify({ id: BOARD_ID, data: data, updated_at: stamp });
-    return fetch(SUPABASE_URL + "/rest/v1/kanban_state", {
-      method: "POST",
-      headers: headers({
-        "Content-Type": "application/json",
-        "Prefer": "resolution=merge-duplicates,return=minimal"
-      }),
-      body: body
-    }).then(function () { window.__lastCloudStamp = stamp; });
+    var body = JSON.stringify({ id: s.user_id, user_id: s.user_id, data: data, updated_at: stamp });
+    function go() {
+      return fetch(SUPABASE_URL + "/rest/v1/kanban_state", {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal" }),
+        body: body
+      });
+    }
+    return go().then(function (r) { return r.status === 401 ? refreshSession().then(go) : r; })
+      .then(function () { window.__lastCloudStamp = stamp; });
   }
 
   var pushTimer = null;
   window.cloudSchedulePush = function () {
-    if (!CLOUD_ENABLED) return;
+    if (!CLOUD_ENABLED || !getSession()) return;
     clearTimeout(pushTimer);
     pushTimer = setTimeout(function () { cloudPush(); }, 700);
   };
@@ -2389,33 +2451,98 @@ window.__bootKanban = function () {
     return true;
   }
 
+  // ---- login screen ----
+  function showLogin(onSuccess) {
+    var wrap = document.createElement("div");
+    wrap.setAttribute("style",
+      "position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;" +
+      "background:#0f1115;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;");
+    wrap.innerHTML =
+      "<div style=\"width:340px;max-width:90vw;background:#1a1d24;border:1px solid #2a2f3a;border-radius:14px;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.5);\">" +
+        "<div style=\"font-size:20px;font-weight:700;color:#fff;margin-bottom:4px;\">VYT's Zone</div>" +
+        "<div style=\"font-size:13px;color:#8b93a7;margin-bottom:20px;\">Enter your email and we'll send you a login link.</div>" +
+        "<input id=\"vyt-email\" type=\"email\" placeholder=\"you@example.com\" autocomplete=\"email\" style=\"width:100%;box-sizing:border-box;padding:11px 12px;margin-bottom:12px;background:#0f1115;border:1px solid #2a2f3a;border-radius:8px;color:#fff;font-size:14px;\">" +
+        "<div id=\"vyt-msg\" style=\"font-size:12.5px;color:#ff6b6b;min-height:17px;margin-bottom:10px;\"></div>" +
+        "<button id=\"vyt-send\" style=\"width:100%;padding:11px;background:#7c3aed;border:0;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;\">Email me a login link</button>" +
+      "</div>";
+    document.body.appendChild(wrap);
+
+    var emailEl = wrap.querySelector("#vyt-email");
+    var msgEl   = wrap.querySelector("#vyt-msg");
+    var sendBtn = wrap.querySelector("#vyt-send");
+    emailEl.focus();
+
+    function fail(e) { msgEl.style.color = "#ff6b6b"; msgEl.textContent = (e && e.message) || String(e); sendBtn.disabled = false; }
+    function sent() {
+      msgEl.style.color = "#4ade80";
+      msgEl.textContent = "Check your email for a login link, then open it on this device.";
+      sendBtn.textContent = "Link sent";
+    }
+    function attempt() {
+      var email = emailEl.value.trim();
+      if (!email) { fail(new Error("Enter your email.")); return; }
+      sendBtn.disabled = true; msgEl.style.color = "#8b93a7"; msgEl.textContent = "Sending…";
+      sendMagicLink(email).then(sent).catch(fail);
+    }
+    sendBtn.addEventListener("click", attempt);
+    emailEl.addEventListener("keydown", function (e) { if (e.key === "Enter") attempt(); });
+    // onSuccess is used after the login link returns and a session is established.
+    void onSuccess;
+  }
+
+  function addLogoutButton() {
+    if (document.getElementById("vyt-logout")) return;
+    var b = document.createElement("button");
+    b.id = "vyt-logout";
+    b.textContent = "Log out";
+    b.setAttribute("style",
+      "position:fixed;bottom:12px;left:12px;z-index:9998;padding:6px 12px;font-size:12px;" +
+      "background:rgba(20,22,28,.85);color:#c3c9d6;border:1px solid #2a2f3a;border-radius:8px;cursor:pointer;");
+    b.addEventListener("click", function () {
+      clearSession();
+      CLOUD_KEYS.forEach(function (k) { localStorage.removeItem(k); }); // don't leave data on this device
+      location.reload();
+    });
+    document.body.appendChild(b);
+  }
+
   // Re-sync when the tab regains focus, so edits made on another device show up.
   window.addEventListener("focus", function () {
-    if (!CLOUD_ENABLED) return;
+    if (!CLOUD_ENABLED || !getSession()) return;
     cloudFetch().then(function (row) {
-      if (row && row.updated_at && row.updated_at !== window.__lastCloudStamp) {
-        location.reload();
-      }
+      if (row && row.updated_at && row.updated_at !== window.__lastCloudStamp) location.reload();
     }).catch(function () {});
   });
 
-  // Boot: load the latest cloud copy first, then start the board.
-  if (!CLOUD_ENABLED) {
-    window.__bootKanban();
-    return;
+  function startBoard() {
+    cloudFetch().then(function (row) {
+      applyCloud(row);          // if null, board just starts from local
+      window.__bootKanban();
+      if (!row) cloudPush();    // first time for this account — seed the cloud
+      addLogoutButton();
+    }).catch(function () {
+      window.__bootKanban();
+      addLogoutButton();
+    });
   }
-  cloudFetch().then(function (row) {
-    if (applyCloud(row)) {
-      window.__bootKanban();
-    } else {
-      // First run with no cloud data yet — start local, then seed the cloud.
-      window.__bootKanban();
-      cloudPush();
-    }
-  }).catch(function () {
-    // Offline or misconfigured — fall back to local so the board still works.
-    window.__bootKanban();
-  });
+
+  // ---- boot ----
+  if (!CLOUD_ENABLED) { window.__bootKanban(); return; }
+  var hs = sessionFromHash();
+  if (hs) {
+    // Returned from clicking the login link — finish signing in.
+    fetchUser(hs.access_token).then(function (u) {
+      setSession({ access_token: hs.access_token, refresh_token: hs.refresh_token, expires_in: hs.expires_in, user: u });
+      history.replaceState(null, "", location.pathname + location.search);
+      startBoard();
+    }).catch(function () {
+      history.replaceState(null, "", location.pathname + location.search);
+      showLogin(startBoard);
+    });
+  } else {
+    ensureFresh().then(function () { startBoard(); })
+                 .catch(function () { showLogin(startBoard); });
+  }
 })();
 </script>
 </body>
