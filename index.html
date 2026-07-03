@@ -784,7 +784,7 @@
 </div>
 
 <script>
-(function () {
+window.__bootKanban = function () {
   "use strict";
   var STORE_CARDS = "vytzone.tickets.v2";
   var STORE_NOTES = "vytzone.notes.v1";
@@ -818,7 +818,7 @@
     try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
     catch (e) { return fallback; }
   }
-  function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); return true; } catch (e) { return false; } }
+  function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); if (window.cloudSchedulePush) window.cloudSchedulePush(); return true; } catch (e) { return false; } }
   function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
   function nextSeq() {
     var n = (load(STORE_SEQ, 0) || 0) + 1;
@@ -2310,6 +2310,112 @@
 
   renderEpics();
   render();
+};
+
+/* =====================================================================
+   CLOUD SYNC (Supabase) — makes the board visible across devices.
+   1. Create a free account at https://supabase.com
+   2. New project. Then in the SQL editor run the snippet from the
+      setup guide to create the "kanban_state" table.
+   3. In Project Settings > API, copy the "Project URL" and the
+      "anon public" key, and paste them below.
+   Until you fill these in, the board still works locally on this device.
+   ===================================================================== */
+(function () {
+  "use strict";
+
+  var SUPABASE_URL      = "https://ebamjhuteebmtfxvppfs.supabase.co";
+  var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImViYW1qaHV0ZWVibXRmeHZwcGZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxMDEzMjksImV4cCI6MjA5ODY3NzMyOX0.MWsmZY2ImPVkO7GgsxJWNCLciIA3gxnhAQ2wFbaRtWo";
+  var BOARD_ID          = "venetia-main";                  // one shared board; keep as-is
+
+  var CLOUD_KEYS = [
+    "vytzone.tickets.v2",
+    "vytzone.notes.v1",
+    "vytzone.notes.v2",
+    "vytzone.seq.v1",
+    "vytzone.epics.v1"
+  ];
+
+  var CLOUD_ENABLED = SUPABASE_URL.indexOf("PASTE_") === -1 &&
+                      SUPABASE_ANON_KEY.indexOf("PASTE_") === -1;
+
+  function headers(extra) {
+    var h = { "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer " + SUPABASE_ANON_KEY };
+    if (extra) for (var k in extra) h[k] = extra[k];
+    return h;
+  }
+
+  function cloudFetch() {
+    var url = SUPABASE_URL + "/rest/v1/kanban_state?id=eq." +
+              encodeURIComponent(BOARD_ID) + "&select=data,updated_at";
+    return fetch(url, { headers: headers() })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (rows) { return (rows && rows[0]) ? rows[0] : null; });
+  }
+
+  function cloudPush() {
+    if (!CLOUD_ENABLED) return Promise.resolve();
+    var data = {};
+    CLOUD_KEYS.forEach(function (k) {
+      var v = localStorage.getItem(k);
+      if (v != null) data[k] = v;
+    });
+    var stamp = new Date().toISOString();
+    var body = JSON.stringify({ id: BOARD_ID, data: data, updated_at: stamp });
+    return fetch(SUPABASE_URL + "/rest/v1/kanban_state", {
+      method: "POST",
+      headers: headers({
+        "Content-Type": "application/json",
+        "Prefer": "resolution=merge-duplicates,return=minimal"
+      }),
+      body: body
+    }).then(function () { window.__lastCloudStamp = stamp; });
+  }
+
+  var pushTimer = null;
+  window.cloudSchedulePush = function () {
+    if (!CLOUD_ENABLED) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(function () { cloudPush(); }, 700);
+  };
+
+  function applyCloud(row) {
+    if (!row || !row.data) return false;
+    Object.keys(row.data).forEach(function (k) {
+      var val = row.data[k];
+      localStorage.setItem(k, typeof val === "string" ? val : JSON.stringify(val));
+    });
+    window.__lastCloudStamp = row.updated_at;
+    return true;
+  }
+
+  // Re-sync when the tab regains focus, so edits made on another device show up.
+  window.addEventListener("focus", function () {
+    if (!CLOUD_ENABLED) return;
+    cloudFetch().then(function (row) {
+      if (row && row.updated_at && row.updated_at !== window.__lastCloudStamp) {
+        location.reload();
+      }
+    }).catch(function () {});
+  });
+
+  // Boot: load the latest cloud copy first, then start the board.
+  if (!CLOUD_ENABLED) {
+    window.__bootKanban();
+    return;
+  }
+  cloudFetch().then(function (row) {
+    if (applyCloud(row)) {
+      window.__bootKanban();
+    } else {
+      // First run with no cloud data yet — start local, then seed the cloud.
+      window.__bootKanban();
+      cloudPush();
+    }
+  }).catch(function () {
+    // Offline or misconfigured — fall back to local so the board still works.
+    window.__bootKanban();
+  });
 })();
 </script>
 </body>
