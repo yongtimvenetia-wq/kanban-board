@@ -438,12 +438,29 @@
   .note-body h3 { font-size: 16px; font-weight: 700; margin: 10px 0 4px; color: var(--muted); text-transform: none; }
   .note-body h1:first-child, .note-body h2:first-child, .note-body h3:first-child { margin-top: 0; }
   .note-body a { color: var(--accent); }
+  .note-body img { max-width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid var(--border); margin: 8px 0; cursor: zoom-in; }
+  .note-img-lightbox { position: fixed; inset: 0; z-index: 2000; display: none; align-items: center; justify-content: center; background: rgba(15,20,35,.8); padding: 30px; cursor: zoom-out; }
+  .note-img-lightbox.show { display: flex; }
+  .note-img-lightbox img { max-width: 96vw; max-height: 92vh; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
   .note-body .todo { display: flex; align-items: flex-start; gap: 8px; margin: 4px 0; }
   .note-body .todo input[type=checkbox] { margin-top: 4px; width: 16px; height: 16px; flex: 0 0 auto; cursor: pointer; accent-color: var(--accent); }
   .note-body .todo.done .todo-text { text-decoration: line-through; color: var(--muted); }
   .todo-text { flex: 1; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
   .note-meta { font-size: 11px; color: var(--muted); margin-top: 10px; min-height: 14px; }
   .note-meta .meta-saved { color: var(--done); }
+
+  /* Notion-style block gutter: hover any line to add or drag it */
+  .note-body { padding-left: 52px; }
+  .note-block-tools { position: fixed; z-index: 1300; display: none; gap: 2px; align-items: center; padding: 2px; background: #fff; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 2px 8px rgba(20,28,48,.12); }
+  .note-block-tools.show { display: flex; }
+  .note-block-tools > div { width: 20px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 5px; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; user-select: none; -webkit-user-select: none; }
+  .note-block-tools > div:hover { background: #eef0fe; color: var(--accent); }
+  .nbt-add { font-weight: 700; }
+  .nbt-drag { cursor: grab; letter-spacing: -3px; font-size: 14px; padding-right: 3px; }
+  .nbt-drag:active { cursor: grabbing; }
+  .note-drop-line { position: fixed; z-index: 1300; height: 3px; background: var(--accent); border-radius: 2px; display: none; pointer-events: none; box-shadow: 0 0 0 1px rgba(99,102,241,.25); }
+  .note-drop-line.show { display: block; }
+  .nb-dragging { opacity: .4; }
 
   @media (max-width: 900px) {
     .notes-app { flex-direction: column; }
@@ -1947,6 +1964,7 @@ window.__bootKanban = function () {
     byId("note-subject").value = n.subject || "";
     byId("note-priority").value = n.priority || "";
     byId("note-body").innerHTML = sanitizeNoteHTML(n.body || "");
+    normalizeNoteBlocks();
     syncTodoClasses();
     setNoteMeta(n, false);
     byId("note-overlay").classList.add("open");
@@ -2002,7 +2020,7 @@ window.__bootKanban = function () {
 
   // sanitizer that also allows checklist items (checkbox inputs + .todo wrappers)
   function sanitizeNoteHTML(html) {
-    var allowed = { B: 1, STRONG: 1, I: 1, EM: 1, U: 1, A: 1, UL: 1, OL: 1, LI: 1, BR: 1, P: 1, DIV: 1, SPAN: 1, INPUT: 1, H1: 1, H2: 1, H3: 1 };
+    var allowed = { B: 1, STRONG: 1, I: 1, EM: 1, U: 1, A: 1, UL: 1, OL: 1, LI: 1, BR: 1, P: 1, DIV: 1, SPAN: 1, INPUT: 1, H1: 1, H2: 1, H3: 1, IMG: 1 };
     var keepClass = { todo: 1, "todo-text": 1, done: 1 };
     var wrap = document.createElement("div"); wrap.innerHTML = html;
     (function clean(node) {
@@ -2014,6 +2032,15 @@ window.__bootKanban = function () {
             var wasChecked = n.hasAttribute("checked") || n.checked;
             Array.prototype.slice.call(n.attributes).forEach(function (a) { n.removeAttribute(a.name); });
             n.setAttribute("type", "checkbox"); if (wasChecked) n.setAttribute("checked", "checked");
+            return;
+          }
+          if (n.tagName === "IMG") {
+            var isrc = n.getAttribute("src") || "";
+            var ialt = n.getAttribute("alt") || "";
+            Array.prototype.slice.call(n.attributes).forEach(function (a) { n.removeAttribute(a.name); });
+            if (/^data:image\/(png|jpeg|jpg|gif|webp);/i.test(isrc) || /^https?:\/\//i.test(isrc)) {
+              n.setAttribute("src", isrc); if (ialt) n.setAttribute("alt", ialt);
+            } else { node.removeChild(n); }
             return;
           }
           var cls = (n.getAttribute("class") || "").split(/\s+/).filter(function (c) { return keepClass[c]; }).join(" ");
@@ -2173,6 +2200,100 @@ window.__bootKanban = function () {
   byId("note-subject").addEventListener("keydown", function (e) { if (e.key === "Enter") e.preventDefault(); }); // title stays one line, just wraps
   byId("note-priority").addEventListener("change", saveActiveNote);
   byId("note-body").addEventListener("input", saveActiveNoteDebounced);
+
+  /* ---------- Screenshots / images in notes (paste + drag & drop) ---------- */
+  // Screenshots are embedded straight into the note. To keep browser storage
+  // from filling up, big images are downscaled (max 1400px) and re-compressed
+  // before they're inserted.
+  function compressImageFile(file, cb) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var maxDim = 1400;
+        var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        var scale = Math.min(1, maxDim / Math.max(w, h));
+        var cw = Math.round(w * scale), ch = Math.round(h * scale);
+        try {
+          var canvas = document.createElement("canvas");
+          canvas.width = cw; canvas.height = ch;
+          var ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, cw, ch);
+          // PNG keeps text crisp for screenshots; fall back to JPEG if it's huge.
+          var out = canvas.toDataURL("image/png");
+          if (out.length > 900000) out = canvas.toDataURL("image/jpeg", 0.82);
+          cb(out);
+        } catch (e) { cb(reader.result); } // canvas can taint on some inputs — use original
+      };
+      img.onerror = function () { cb(reader.result); };
+      img.src = reader.result;
+    };
+    reader.onerror = function () { cb(null); };
+    reader.readAsDataURL(file);
+  }
+  function insertNoteImage(file) {
+    if (!file || file.type.indexOf("image/") !== 0) return;
+    var body = byId("note-body"); body.focus();
+    compressImageFile(file, function (dataUrl) {
+      if (!dataUrl) return;
+      body.focus();
+      var img = document.createElement("img");
+      img.src = dataUrl; img.alt = file.name || "screenshot";
+      var sel = window.getSelection(), range = null;
+      if (sel && sel.rangeCount && body.contains(sel.anchorNode)) range = sel.getRangeAt(0);
+      if (range) {
+        range.deleteContents(); range.insertNode(img);
+        var after = document.createElement("div"); after.appendChild(document.createElement("br"));
+        if (img.parentNode) img.parentNode.insertBefore(after, img.nextSibling);
+        var r2 = document.createRange(); r2.setStart(after, 0); r2.collapse(true);
+        sel.removeAllRanges(); sel.addRange(r2);
+      } else {
+        body.appendChild(img);
+        body.appendChild(document.createElement("div")).appendChild(document.createElement("br"));
+      }
+      saveActiveNote();
+    });
+  }
+  byId("note-body").addEventListener("paste", function (e) {
+    var items = (e.clipboardData && e.clipboardData.items) || [];
+    var handled = false;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === "file" && items[i].type.indexOf("image/") === 0) {
+        var f = items[i].getAsFile();
+        if (f) { insertNoteImage(f); handled = true; }
+      }
+    }
+    if (handled) e.preventDefault(); // don't also paste the image's file path as text
+  });
+  byId("note-body").addEventListener("dragover", function (e) {
+    if (e.dataTransfer && Array.prototype.some.call(e.dataTransfer.items || [], function (it) { return it.kind === "file"; })) {
+      e.preventDefault(); e.dataTransfer.dropEffect = "copy";
+    }
+  });
+  byId("note-body").addEventListener("drop", function (e) {
+    var files = (e.dataTransfer && e.dataTransfer.files) || [];
+    var imgs = Array.prototype.filter.call(files, function (f) { return f.type.indexOf("image/") === 0; });
+    if (imgs.length) {
+      e.preventDefault();
+      // place the cursor where the image was dropped, if the browser supports it
+      try {
+        var r = document.caretRangeFromPoint ? document.caretRangeFromPoint(e.clientX, e.clientY) : null;
+        if (r) { var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); }
+      } catch (err) {}
+      imgs.forEach(insertNoteImage);
+    }
+  });
+  // Click an image to view it full-size
+  (function () {
+    var lb = document.createElement("div"); lb.className = "note-img-lightbox";
+    var lbImg = document.createElement("img"); lb.appendChild(lbImg);
+    document.body.appendChild(lb);
+    lb.addEventListener("click", function () { lb.classList.remove("show"); });
+    byId("note-body").addEventListener("click", function (e) {
+      if (e.target && e.target.tagName === "IMG") { lbImg.src = e.target.src; lb.classList.add("show"); }
+    });
+  })();
+
   // Backspace on an empty checkbox row deletes the whole row in one press
   byId("note-body").addEventListener("keydown", function (e) {
     if (e.key !== "Backspace") return;
@@ -2277,6 +2398,160 @@ window.__bootKanban = function () {
     updateNoteToolbarState();
   });
   ["keyup", "mouseup", "focus"].forEach(function (ev) { byId("note-body").addEventListener(ev, updateNoteToolbarState); });
+
+  /* ---------- Notion-style block gutter (add + drag-reorder note lines) ---------- */
+  // Wrap any stray top-level text / <br> into a block element so every line is
+  // a draggable, hoverable block. Whitespace-only stragglers are dropped.
+  function normalizeNoteBlocks() {
+    var body = byId("note-body");
+    Array.prototype.slice.call(body.childNodes).forEach(function (n) {
+      if (n.nodeType === 3) { // text node
+        if (n.textContent.trim() === "") { body.removeChild(n); return; }
+        var d = document.createElement("div"); body.insertBefore(d, n); d.appendChild(n);
+      } else if (n.nodeType === 1 && n.tagName === "BR") {
+        var d2 = document.createElement("div"); body.insertBefore(d2, n); d2.appendChild(n);
+      }
+    });
+  }
+
+  (function setupNoteBlockGutter() {
+    var body = byId("note-body");
+    var modal = byId("note-overlay").querySelector(".note-modal");
+    var tools = document.createElement("div");
+    tools.className = "note-block-tools";
+    tools.setAttribute("contenteditable", "false");
+    tools.innerHTML = '<div class="nbt-add" title="Add a line below (Alt-click to add above)">+</div>' +
+                      '<div class="nbt-drag" draggable="true" title="Drag to move this line">⠿</div>';
+    modal.appendChild(tools);
+    var dropLine = document.createElement("div");
+    dropLine.className = "note-drop-line";
+    modal.appendChild(dropLine);
+
+    var hoveredBlock = null, draggedBlock = null, dragging = false;
+
+    function topBlock(target) {
+      if (!target || !body.contains(target)) return null;
+      var el = target;
+      while (el && el.parentNode !== body) el = el.parentNode;
+      return (el && el.nodeType === 1) ? el : null;
+    }
+    function positionTools(block) {
+      if (!block) { tools.classList.remove("show"); return; }
+      hoveredBlock = block;
+      var r = block.getBoundingClientRect();
+      tools.style.top = (r.top - 2) + "px";
+      tools.style.left = (r.left - 50) + "px";
+      tools.classList.add("show");
+    }
+    function placeCaret(el) {
+      el.focus && el.focus();
+      var sel = window.getSelection(); if (!sel) return;
+      var r = document.createRange();
+      r.selectNodeContents(el); r.collapse(true);
+      sel.removeAllRanges(); sel.addRange(r);
+    }
+
+    // Which top-level block sits at this vertical position? Using clientY (not the
+    // event target) means the gutter stays put while the cursor crosses the empty
+    // left margin on its way to the + / drag handle.
+    function blockAtY(y) {
+      var kids = body.children, nearest = null, best = Infinity;
+      for (var i = 0; i < kids.length; i++) {
+        var k = kids[i]; if (k.nodeType !== 1) continue;
+        var r = k.getBoundingClientRect();
+        if (y >= r.top && y <= r.bottom) return k;
+        var d = y < r.top ? r.top - y : y - r.bottom;
+        if (d < best) { best = d; nearest = k; }
+      }
+      return nearest;
+    }
+    body.addEventListener("mousemove", function (e) {
+      if (dragging) return;
+      var b = topBlock(e.target) || blockAtY(e.clientY);
+      if (b) positionTools(b);
+    });
+    body.addEventListener("scroll", function () { if (hoveredBlock && tools.classList.contains("show")) positionTools(hoveredBlock); });
+    // when focus leaves the editor, tidy any stray unwrapped line into a real block
+    body.addEventListener("blur", function () { if (!dragging) normalizeNoteBlocks(); });
+    // hide the gutter when the pointer leaves the editor area (but not when it's over the gutter itself)
+    modal.addEventListener("mousemove", function (e) {
+      if (dragging) return;
+      if (body.contains(e.target) || tools.contains(e.target)) return;
+      tools.classList.remove("show");
+    });
+
+    // + button: add an empty line below the hovered block (Alt-click = above)
+    tools.querySelector(".nbt-add").addEventListener("mousedown", function (e) {
+      e.preventDefault();
+      if (!hoveredBlock) return;
+      var line = document.createElement("div");
+      line.appendChild(document.createElement("br"));
+      if (e.altKey) body.insertBefore(line, hoveredBlock);
+      else body.insertBefore(line, hoveredBlock.nextSibling);
+      placeCaret(line);
+      saveActiveNoteDebounced();
+    });
+
+    // drag handle: reorder blocks
+    var handle = tools.querySelector(".nbt-drag");
+    handle.addEventListener("dragstart", function (e) {
+      if (!hoveredBlock) { e.preventDefault(); return; }
+      dragging = true; draggedBlock = hoveredBlock;
+      draggedBlock.classList.add("nb-dragging");
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", "note-block"); } catch (_) {}
+      try { e.dataTransfer.setDragImage(draggedBlock, 10, 10); } catch (_) {}
+      // Hide the gutter AFTER the drag has started — hiding it synchronously
+      // here makes Chrome cancel the drag, so defer it a tick.
+      setTimeout(function () { if (dragging) tools.classList.remove("show"); }, 0);
+    });
+    handle.addEventListener("dragend", function () {
+      dragging = false;
+      if (draggedBlock) draggedBlock.classList.remove("nb-dragging");
+      draggedBlock = null;
+      dropLine.classList.remove("show");
+    });
+
+    function dropTarget(y) {
+      var kids = body.children;
+      if (!kids.length) return null;
+      for (var i = 0; i < kids.length; i++) {
+        var k = kids[i]; if (k === draggedBlock) continue;
+        var r = k.getBoundingClientRect();
+        if (y < r.top + r.height / 2) return { block: k, before: true };
+      }
+      var last = kids[kids.length - 1];
+      if (last === draggedBlock) return null;
+      return { block: last, before: false };
+    }
+    function showDropLine(t) {
+      if (!t) { dropLine.classList.remove("show"); return; }
+      var r = t.block.getBoundingClientRect();
+      dropLine.style.left = r.left + "px";
+      dropLine.style.width = r.width + "px";
+      dropLine.style.top = (t.before ? r.top - 2 : r.bottom - 1) + "px";
+      dropLine.classList.add("show");
+    }
+    body.addEventListener("dragover", function (e) {
+      if (!dragging) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = "move";
+      showDropLine(dropTarget(e.clientY));
+    });
+    body.addEventListener("drop", function (e) {
+      if (!dragging) return;
+      e.preventDefault();
+      var t = dropTarget(e.clientY);
+      if (t && draggedBlock) {
+        if (t.before) body.insertBefore(draggedBlock, t.block);
+        else body.insertBefore(draggedBlock, t.block.nextSibling);
+      }
+      dropLine.classList.remove("show");
+      if (draggedBlock) draggedBlock.classList.remove("nb-dragging");
+      dragging = false; draggedBlock = null;
+      saveActiveNote();
+    });
+  })();
+
   // toggling a checklist item persists its state
   byId("note-body").addEventListener("change", function (e) {
     if (e.target && e.target.type === "checkbox") {
@@ -2527,7 +2802,13 @@ window.__bootKanban = function () {
   }
 
   // ---- boot ----
-  if (!CLOUD_ENABLED) { window.__bootKanban(); return; }
+  // Local preview bypass: when the file is opened directly (file://) or served
+  // from localhost, skip the email login and run the board straight from this
+  // device's storage. The published https:// site is unaffected and still
+  // requires login + cloud sync.
+  var IS_LOCAL_PREVIEW = location.protocol === "file:" ||
+                         /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  if (!CLOUD_ENABLED || IS_LOCAL_PREVIEW) { window.__bootKanban(); return; }
   var hs = sessionFromHash();
   if (hs) {
     // Returned from clicking the login link — finish signing in.
