@@ -373,6 +373,22 @@
   .ct-btn:hover { background: var(--panel); border-color: var(--border); }
   .ct-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
   .ct-sep { width: 1px; align-self: stretch; background: var(--border); margin: 2px 4px; }
+  /* Font-color button + swatch palette */
+  .ct-color-wrap { position: relative; display: inline-flex; }
+  .ct-color-a { font-weight: 800; border-bottom: 3px solid var(--ct-color-current, #ef4444); padding-bottom: 1px; line-height: 1; }
+  .ct-color-pop { position: absolute; top: 100%; left: 0; margin-top: 4px; z-index: 60; display: none; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 20px rgba(20,28,48,.15); padding: 8px; }
+  .ct-color-pop.show { display: block; }
+  .ct-swatches { display: grid; grid-template-columns: repeat(5, 22px); gap: 6px; }
+  .ct-swatch { width: 22px; height: 22px; border-radius: 6px; border: 1px solid rgba(0,0,0,.12); cursor: pointer; padding: 0; position: relative; }
+  .ct-swatch:hover { transform: scale(1.08); }
+  .ct-swatch.ct-default { background: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--text); font-weight: 700; }
+  .ct-table-tools .ct-btn { font-size: 11px; padding: 5px 6px; min-width: 0; }
+  /* Tables inside notes */
+  .note-body table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 14px; }
+  .note-body table td, .note-body table th { border: 1px solid var(--border); padding: 7px 10px; min-width: 40px; vertical-align: top; text-align: left; }
+  .note-body table th { background: var(--bg); font-weight: 700; }
+  .note-body table tr:nth-child(even) td { background: rgba(99,102,241,.03); }
+  .note-body table td:focus, .note-body table th:focus { outline: 2px solid rgba(99,102,241,.35); outline-offset: -2px; }
   .ct-clear { display: inline-flex; align-items: center; justify-content: center; }
   .ct-clear svg { display: block; }
   .comment-input { min-height: 64px; max-height: 200px; overflow-y: auto; overflow-x: hidden; overflow-wrap: anywhere; word-break: break-word; padding: 10px 12px; font-size: 13px; color: var(--text); outline: none; }
@@ -433,6 +449,12 @@
   .note-body { border: 1px solid var(--border); border-radius: 0 0 10px 10px; min-height: 320px; max-height: calc(100vh - 320px); overflow-y: auto; overflow-x: hidden; overflow-wrap: anywhere; word-break: break-word; padding: 16px; font-size: 15px; line-height: 1.65; color: var(--text); outline: none; }
   .note-body:empty:before { content: attr(data-placeholder); color: var(--muted); }
   .note-body ul, .note-body ol { margin: 6px 0; padding-left: 24px; }
+  /* Nested lists (sub-items via Tab) get their own margers so each level reads clearly */
+  .note-body ul ul { list-style-type: circle; }
+  .note-body ul ul ul { list-style-type: square; }
+  .note-body ol ol { list-style-type: lower-alpha; }
+  .note-body ol ol ol { list-style-type: lower-roman; }
+  .note-body li ul, .note-body li ol { margin: 2px 0; }
   .note-body h1 { font-size: 24px; font-weight: 800; margin: 14px 0 8px; line-height: 1.25; }
   .note-body h2 { font-size: 19px; font-weight: 700; margin: 12px 0 6px; line-height: 1.3; }
   .note-body h3 { font-size: 16px; font-weight: 700; margin: 10px 0 4px; color: var(--muted); text-transform: none; }
@@ -552,8 +574,26 @@
             <button type="button" class="ct-btn" data-cmd="insertOrderedList" title="Numbered list">1.&#8202;List</button>
             <button type="button" class="ct-btn" data-cmd="checkbox" title="Checklist item">&#9745;&#8202;To-do</button>
             <span class="ct-sep"></span>
+            <div class="ct-color-wrap">
+              <button type="button" class="ct-btn" data-cmd="color" title="Font color" aria-label="Font color"><span class="ct-color-a">A</span></button>
+              <div class="ct-color-pop" id="note-color-pop">
+                <div class="ct-swatches"></div>
+              </div>
+            </div>
+            <button type="button" class="ct-btn" data-cmd="insertTable" title="Insert table">&#9638;&#8202;Table</button>
+            <span class="ct-sep"></span>
             <button type="button" class="ct-btn" data-cmd="createLink" title="Insert link">🔗 Link</button>
             <button type="button" class="ct-btn ct-clear" data-cmd="removeFormat" title="Clear formatting — removes bold, headings, lists and links from the selected text" aria-label="Clear formatting"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.24 3.56l4.2 4.2a1.5 1.5 0 0 1 0 2.12L11.66 18.6a2 2 0 0 1-2.83 0L4.1 13.86a1.5 1.5 0 0 1 0-2.12l8.02-8.18a1.5 1.5 0 0 1 2.12 0z"/><path d="M9 18.6H20"/></svg></button>
+            <span class="ct-sep ct-table-tools" style="display:none"></span>
+            <span class="ct-table-tools" style="display:none">
+              <button type="button" class="ct-btn" data-cmd="rowAbove" title="Insert row above">↑+ Row</button>
+              <button type="button" class="ct-btn" data-cmd="rowBelow" title="Insert row below">↓+ Row</button>
+              <button type="button" class="ct-btn" data-cmd="colLeft" title="Insert column left">←+ Col</button>
+              <button type="button" class="ct-btn" data-cmd="colRight" title="Insert column right">+→ Col</button>
+              <button type="button" class="ct-btn ct-clear" data-cmd="delRow" title="Delete current row">✕ Row</button>
+              <button type="button" class="ct-btn ct-clear" data-cmd="delCol" title="Delete current column">✕ Col</button>
+              <button type="button" class="ct-btn ct-clear" data-cmd="delTable" title="Delete table">🗑 Table</button>
+            </span>
           </div>
           <div id="note-body" class="note-body" contenteditable="true" data-placeholder="Start writing… use the toolbar to add lists, checkboxes and links."></div>
           <div class="note-meta" id="note-meta"></div>
@@ -2020,8 +2060,15 @@ window.__bootKanban = function () {
 
   // sanitizer that also allows checklist items (checkbox inputs + .todo wrappers)
   function sanitizeNoteHTML(html) {
-    var allowed = { B: 1, STRONG: 1, I: 1, EM: 1, U: 1, A: 1, UL: 1, OL: 1, LI: 1, BR: 1, P: 1, DIV: 1, SPAN: 1, INPUT: 1, H1: 1, H2: 1, H3: 1, IMG: 1 };
+    var allowed = { B: 1, STRONG: 1, I: 1, EM: 1, U: 1, A: 1, UL: 1, OL: 1, LI: 1, BR: 1, P: 1, DIV: 1, SPAN: 1, FONT: 1, INPUT: 1, H1: 1, H2: 1, H3: 1, IMG: 1, TABLE: 1, THEAD: 1, TBODY: 1, TFOOT: 1, TR: 1, TD: 1, TH: 1 };
     var keepClass = { todo: 1, "todo-text": 1, done: 1 };
+    function safeColor(c) {
+      if (!c) return null; c = String(c).trim().toLowerCase();
+      if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/.test(c)) return c;
+      if (/^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/.test(c)) return c;
+      if (/^[a-z]{3,20}$/.test(c)) return c;
+      return null;
+    }
     var wrap = document.createElement("div"); wrap.innerHTML = html;
     (function clean(node) {
       Array.prototype.slice.call(node.childNodes).forEach(function (n) {
@@ -2045,8 +2092,13 @@ window.__bootKanban = function () {
           }
           var cls = (n.getAttribute("class") || "").split(/\s+/).filter(function (c) { return keepClass[c]; }).join(" ");
           var href = (n.tagName === "A") ? n.getAttribute("href") : null;
+          var color = null;
+          if (n.tagName === "SPAN" || n.tagName === "FONT") {
+            color = safeColor((n.style && n.style.color) || n.getAttribute("color"));
+          }
           Array.prototype.slice.call(n.attributes).forEach(function (a) { n.removeAttribute(a.name); });
           if (cls) n.setAttribute("class", cls);
+          if (color) n.setAttribute("style", "color:" + color);
           if (n.tagName === "A" && href && /^https?:|^mailto:/i.test(href)) {
             n.setAttribute("href", href); n.setAttribute("target", "_blank"); n.setAttribute("rel", "noopener noreferrer");
           }
@@ -2331,6 +2383,26 @@ window.__bootKanban = function () {
       saveActiveNoteDebounced();
     }
   });
+  // Tab / Shift+Tab: nest (indent) or un-nest (outdent) the current list item,
+  // so you can build sub-bullets / sub-numbers under bulleted and numbered lists.
+  byId("note-body").addEventListener("keydown", function (e) {
+    if (e.key !== "Tab") return;
+    var sel = window.getSelection(); if (!sel || !sel.rangeCount) return;
+    var node = sel.anchorNode; if (!node) return;
+    var el = node.nodeType === Node.TEXT_NODE ? node.parentNode : node;
+    var li = (el && el.closest) ? el.closest("li") : null;
+    if (!li || !byId("note-body").contains(li)) return; // only hijack Tab inside a list
+    e.preventDefault();
+    try { document.execCommand("styleWithCSS", false, false); } catch (_) {}
+    if (e.shiftKey) {
+      document.execCommand("outdent", false, null);
+    } else if (li.previousElementSibling) {
+      // need a preceding item to nest beneath; otherwise Tab does nothing here
+      document.execCommand("indent", false, null);
+    }
+    saveActiveNoteDebounced();
+    updateNoteToolbarState();
+  });
   // ⌘K / Ctrl+K inserts a link in the note body
   byId("note-body").addEventListener("keydown", function (e) {
     if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
@@ -2378,11 +2450,34 @@ window.__bootKanban = function () {
     }
   });
 
+  // swatch clicks: apply colour without losing the text selection
+  byId("note-color-pop").addEventListener("mousedown", function (e) {
+    var s = e.target.closest(".ct-swatch"); if (!s) return;
+    e.preventDefault();
+    applyNoteColor(s.getAttribute("data-color") || "");
+    toggleColorPop(false);
+  });
+  // close the colour palette when clicking elsewhere
+  document.addEventListener("mousedown", function (e) {
+    var pop = byId("note-color-pop"); if (!pop || !pop.classList.contains("show")) return;
+    if (e.target.closest(".ct-color-wrap")) return;
+    toggleColorPop(false);
+  });
+
   byId("note-toolbar").addEventListener("mousedown", function (e) {
     var b = e.target.closest(".ct-btn"); if (!b) return;
     e.preventDefault();
-    byId("note-body").focus();
     var cmd = b.getAttribute("data-cmd");
+    if (cmd === "color") { toggleColorPop(); return; }
+    byId("note-body").focus();
+    if (cmd === "insertTable") { insertNoteTable(3, 3); updateNoteToolbarState(); return; }
+    if (cmd === "rowAbove") { insertTableRow("above"); return; }
+    if (cmd === "rowBelow") { insertTableRow("below"); return; }
+    if (cmd === "colLeft") { insertTableCol("left"); return; }
+    if (cmd === "colRight") { insertTableCol("right"); return; }
+    if (cmd === "delRow") { deleteTableRow(); return; }
+    if (cmd === "delCol") { deleteTableCol(); return; }
+    if (cmd === "delTable") { deleteTable(); return; }
     if (cmd === "h1" || cmd === "h2" || cmd === "h3") {
       var isOn = false; try { isOn = document.queryCommandValue("formatBlock").toLowerCase() === cmd; } catch (err) {}
       document.execCommand("formatBlock", false, isOn ? "p" : cmd);
@@ -2560,6 +2655,125 @@ window.__bootKanban = function () {
       saveActiveNote();
     }
   });
+  /* ---------- Font colour (fixed swatch palette) ---------- */
+  var NOTE_COLORS = [
+    { name: "Default", value: "" },
+    { name: "Red", value: "#ef4444" },
+    { name: "Orange", value: "#f97316" },
+    { name: "Amber", value: "#eab308" },
+    { name: "Green", value: "#16a34a" },
+    { name: "Teal", value: "#0d9488" },
+    { name: "Blue", value: "#2563eb" },
+    { name: "Purple", value: "#7c3aed" },
+    { name: "Pink", value: "#db2777" },
+    { name: "Grey", value: "#6b7280" }
+  ];
+  function buildColorSwatches() {
+    var wrap = document.querySelector("#note-color-pop .ct-swatches");
+    if (!wrap || wrap.childNodes.length) return;
+    NOTE_COLORS.forEach(function (c) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "ct-swatch" + (c.value ? "" : " ct-default");
+      b.title = c.name;
+      b.setAttribute("data-color", c.value);
+      if (c.value) b.style.background = c.value; else b.textContent = "A";
+      wrap.appendChild(b);
+    });
+  }
+  function applyNoteColor(color) {
+    var body = byId("note-body"); body.focus();
+    try { document.execCommand("styleWithCSS", false, true); } catch (e) {}
+    // empty value = reset to the note's default text colour
+    var val = color || getComputedStyle(body).color || "#0f1423";
+    document.execCommand("foreColor", false, val);
+    try { document.execCommand("styleWithCSS", false, false); } catch (e) {}
+    var swatch = document.querySelector(".ct-color-a");
+    if (swatch && color) swatch.style.setProperty("--ct-color-current", color);
+    saveActiveNoteDebounced();
+  }
+  function toggleColorPop(force) {
+    var pop = byId("note-color-pop"); if (!pop) return;
+    buildColorSwatches();
+    var show = (typeof force === "boolean") ? force : !pop.classList.contains("show");
+    pop.classList.toggle("show", show);
+  }
+
+  /* ---------- Tables (insert + add/delete rows & columns) ---------- */
+  function insertNoteTable(rows, cols) {
+    rows = rows || 3; cols = cols || 3;
+    var body = byId("note-body"); body.focus();
+    var html = '<table><thead><tr>';
+    for (var c = 0; c < cols; c++) html += '<th>Header ' + (c + 1) + '</th>';
+    html += '</tr></thead><tbody>';
+    for (var r = 0; r < rows - 1; r++) {
+      html += '<tr>';
+      for (var c2 = 0; c2 < cols; c2++) html += '<td><br></td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table><p><br></p>';
+    document.execCommand("insertHTML", false, html);
+    saveActiveNoteDebounced();
+  }
+  function currentCell() {
+    var sel = window.getSelection(); if (!sel || !sel.rangeCount) return null;
+    var node = sel.anchorNode; if (!node) return null;
+    if (node.nodeType === 3) node = node.parentNode;
+    if (!node.closest) return null;
+    var cell = node.closest("td,th");
+    if (cell && byId("note-body").contains(cell)) return cell;
+    return null;
+  }
+  function cellIndex(cell) {
+    var row = cell.parentNode, i = 0;
+    for (var k = 0; k < row.children.length; k++) { if (row.children[k] === cell) return i; i++; }
+    return 0;
+  }
+  function newCellLike(ref) {
+    var td = document.createElement(ref.tagName.toLowerCase() === "th" ? "th" : "td");
+    td.innerHTML = "<br>"; return td;
+  }
+  function insertTableRow(where) {
+    var cell = currentCell(); if (!cell) return;
+    var row = cell.parentNode, table = cell.closest("table");
+    var cols = row.children.length;
+    var newRow = document.createElement("tr");
+    for (var i = 0; i < cols; i++) { var td = document.createElement("td"); td.innerHTML = "<br>"; newRow.appendChild(td); }
+    if (where === "above") row.parentNode.insertBefore(newRow, row);
+    else row.parentNode.insertBefore(newRow, row.nextSibling);
+    saveActiveNoteDebounced();
+  }
+  function insertTableCol(where) {
+    var cell = currentCell(); if (!cell) return;
+    var idx = cellIndex(cell), table = cell.closest("table");
+    Array.prototype.forEach.call(table.rows, function (row) {
+      var ref = row.children[idx] || null;
+      var nc = newCellLike(ref || row.children[0] || cell);
+      if (where === "left") row.insertBefore(nc, ref);
+      else row.insertBefore(nc, ref ? ref.nextSibling : null);
+    });
+    saveActiveNoteDebounced();
+  }
+  function deleteTableRow() {
+    var cell = currentCell(); if (!cell) return;
+    var row = cell.parentNode, table = cell.closest("table");
+    if (table.rows.length <= 1) { table.remove(); }
+    else row.remove();
+    saveActiveNoteDebounced(); updateNoteToolbarState();
+  }
+  function deleteTableCol() {
+    var cell = currentCell(); if (!cell) return;
+    var idx = cellIndex(cell), table = cell.closest("table");
+    if ((table.rows[0] ? table.rows[0].children.length : 0) <= 1) { table.remove(); }
+    else Array.prototype.forEach.call(table.rows, function (row) { if (row.children[idx]) row.children[idx].remove(); });
+    saveActiveNoteDebounced(); updateNoteToolbarState();
+  }
+  function deleteTable() {
+    var cell = currentCell(); if (!cell) return;
+    var table = cell.closest("table"); if (table) table.remove();
+    saveActiveNoteDebounced(); updateNoteToolbarState();
+  }
+
   function updateNoteToolbarState() {
     ["bold", "italic", "underline", "insertUnorderedList", "insertOrderedList"].forEach(function (cmd) {
       var btn = document.querySelector('#note-toolbar .ct-btn[data-cmd="' + cmd + '"]');
@@ -2570,6 +2784,11 @@ window.__bootKanban = function () {
     ["h1", "h2", "h3"].forEach(function (h) {
       var btn = document.querySelector('#note-toolbar .ct-btn[data-cmd="' + h + '"]');
       if (btn) btn.classList.toggle("active", block === h);
+    });
+    // show table controls only when the cursor sits inside a table
+    var inTable = !!currentCell();
+    Array.prototype.forEach.call(document.querySelectorAll("#note-toolbar .ct-table-tools"), function (el) {
+      el.style.display = inTable ? "" : "none";
     });
   }
 
@@ -2781,11 +3000,31 @@ window.__bootKanban = function () {
     document.body.appendChild(b);
   }
 
+  // Compare timestamps by their actual instant, not their text form. The cloud
+  // returns timestamps in a slightly different string format than the one we
+  // send, so a raw string compare treats our own writes as "someone else changed
+  // it" and reloads — wiping in-progress edits and resetting the tab.
+  function stampMs(x) { if (!x) return 0; var t = new Date(x).getTime(); return isNaN(t) ? 0 : t; }
+
+  // True while the user is actively typing/editing, so we never reload from under them.
+  function isEditingNow() {
+    var a = document.activeElement;
+    if (a && (a.isContentEditable || a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.tagName === "SELECT")) return true;
+    var openOverlay = document.querySelector(".overlay.show, .overlay.open");
+    if (openOverlay) return true;
+    return false;
+  }
+
   // Re-sync when the tab regains focus, so edits made on another device show up.
   window.addEventListener("focus", function () {
     if (!CLOUD_ENABLED || !getSession()) return;
+    // Don't disturb an active edit, and don't reload while our own push is still pending.
+    if (isEditingNow() || pushTimer) return;
     cloudFetch().then(function (row) {
-      if (row && row.updated_at && row.updated_at !== window.__lastCloudStamp) location.reload();
+      if (!row || !row.updated_at) return;
+      // Only reload for a genuinely newer remote change. The 2s slack absorbs
+      // formatting/rounding differences so our own recent write never counts.
+      if (stampMs(row.updated_at) > stampMs(window.__lastCloudStamp) + 2000) location.reload();
     }).catch(function () {});
   });
 
