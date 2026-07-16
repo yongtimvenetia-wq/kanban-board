@@ -54,7 +54,28 @@
   }
   .tab:hover { color: var(--text); }
   .tab.active { color: var(--accent); background: #eef0fe; }
-  .saved-ind { margin-left: auto; display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+  /* global search */
+  .gsearch { position: relative; margin-left: auto; }
+  .gsearch input {
+    width: 210px; max-width: 42vw; border: 1px solid var(--border); border-radius: 9px;
+    padding: 8px 11px; font-size: 13px; font-family: inherit; background: #fff; color: var(--text);
+    transition: width .15s ease, border-color .15s ease;
+  }
+  .gsearch input:focus { outline: 2px solid rgba(99,102,241,.3); border-color: var(--accent); width: 260px; }
+  .gsearch-results {
+    position: absolute; top: calc(100% + 6px); right: 0; width: 340px; max-width: 80vw;
+    max-height: 60vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; box-shadow: 0 10px 30px rgba(20,30,55,.16); z-index: 40; padding: 6px; display: none;
+  }
+  .gsearch-results.open { display: block; }
+  .gsr-group { font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); padding: 8px 10px 4px; }
+  .gsr-item { padding: 8px 10px; border-radius: 8px; cursor: pointer; display: block; }
+  .gsr-item:hover, .gsr-item.active { background: var(--bg); }
+  .gsr-item .gsr-title { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; }
+  .gsr-item .gsr-tag { font-size: 10px; font-weight: 700; color: var(--accent); }
+  .gsr-item .gsr-sub { font-size: 11px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gsr-empty { padding: 14px 12px; font-size: 13px; color: var(--muted); text-align: center; }
+  .saved-ind { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
   .saved-ind .dot-green { width: 8px; height: 8px; border-radius: 50%; background: var(--done); }
   main { padding: 22px 28px; max-width: 1680px; margin: 0 auto; }
   .view { display: none; }
@@ -217,7 +238,11 @@
   .chip.label { background: #ecfdf5; color: #047857; border-color: #d1fae5; }
   .chip.assignee { background: #eef2ff; color: #4338ca; border-color: #e0e7ff; }
   .chip.due { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+  .chip.duesoon { background: #fefce8; color: #a16207; border-color: #fde68a; }
   .chip.overdue { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+  /* card-level due accents (left bar, no layout shift) */
+  .card.due-soon { border-left: 4px solid #f59e0b; padding-left: 11px; }
+  .card.due-overdue { border-left: 4px solid #ef4444; padding-left: 11px; }
   .cards.drop-hint { background: rgba(99,102,241,.06); border-radius: 10px; }
 
   /* Modal */
@@ -396,7 +421,9 @@
   .comment-input p { margin: 0 0 6px; }
   .comment-input ul, .comment-input ol { margin: 4px 0; padding-left: 22px; }
   .comment-input a { color: var(--accent); }
-  .comment-actions { display: flex; justify-content: flex-end; padding: 6px 8px; border-top: 1px solid var(--border); background: var(--bg); }
+  .comment-actions { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-top: 1px solid var(--border); background: var(--bg); }
+  .draft-status { font-size: 11px; color: var(--muted); opacity: 0; transition: opacity .3s ease; padding-left: 4px; }
+  .draft-status.show { opacity: 1; }
   .log li .comment-body { color: var(--text); }
   .log li .comment-body ul, .log li .comment-body ol { margin: 4px 0; padding-left: 20px; }
   .log li .comment-body a { color: var(--accent); }
@@ -464,6 +491,9 @@
   .note-img-lightbox { position: fixed; inset: 0; z-index: 2000; display: none; align-items: center; justify-content: center; background: rgba(15,20,35,.8); padding: 30px; cursor: zoom-out; }
   .note-img-lightbox.show { display: flex; }
   .note-img-lightbox img { max-width: 96vw; max-height: 92vh; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+  .note-img-delete { position: fixed; z-index: 2100; display: none; width: 26px; height: 26px; padding: 0; border: none; border-radius: 50%; background: rgba(20,25,40,.85); color: #fff; font-size: 16px; line-height: 26px; text-align: center; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+  .note-img-delete:hover { background: #e0413a; }
+  .note-img-delete.show { display: block; }
   .note-body .todo { display: flex; align-items: flex-start; gap: 8px; margin: 4px 0; }
   .note-body .todo input[type=checkbox] { margin-top: 4px; width: 16px; height: 16px; flex: 0 0 auto; cursor: pointer; accent-color: var(--accent); }
   .note-body .todo.done .todo-text { text-decoration: line-through; color: var(--muted); }
@@ -503,6 +533,10 @@
     <button class="tab active" data-view="board">Board</button>
     <button class="tab" data-view="notes">Notes</button>
   </nav>
+  <div class="gsearch">
+    <input id="gsearch-input" type="text" placeholder="🔍 Search everything…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="gsearch-results">
+    <div class="gsearch-results" id="gsearch-results" role="listbox"></div>
+  </div>
   <div class="saved-ind"><span class="dot-green"></span> Saved locally</div>
 </header>
 
@@ -724,6 +758,7 @@
         </div>
         <div id="f-comment" class="comment-input" contenteditable="true" data-placeholder="Add a comment…"></div>
         <div class="comment-actions">
+          <span class="draft-status" id="f-comment-draft"></span>
           <button class="btn ghost" id="m-comment-btn">Post</button>
         </div>
       </div>
@@ -892,6 +927,14 @@ window.__bootKanban = function () {
     if (!due || status === "done") return false;
     return new Date(due + "T23:59:59") < new Date();
   }
+  // "overdue" | "soon" (within 3 days) | "" — used for card + chip styling
+  function dueState(due, status) {
+    if (!due || status === "done") return "";
+    var end = new Date(due + "T23:59:59"), nowD = new Date();
+    if (end < nowD) return "overdue";
+    var soon = new Date(); soon.setHours(23, 59, 59, 999); soon.setDate(soon.getDate() + 3);
+    return end <= soon ? "soon" : "";
+  }
 
   // migrate / seed
   var cards = load(STORE_CARDS, null);
@@ -944,14 +987,84 @@ window.__bootKanban = function () {
   }
 
   // --- tabs ---
+  function goToView(view) {
+    document.querySelectorAll(".tab").forEach(function (x) { x.classList.toggle("active", x.dataset.view === view); });
+    document.querySelectorAll(".view").forEach(function (x) { x.classList.remove("active"); });
+    document.getElementById(view === "board" ? "board" : "notes-view").classList.add("active");
+  }
   document.querySelectorAll(".tab").forEach(function (t) {
-    t.addEventListener("click", function () {
-      document.querySelectorAll(".tab").forEach(function (x) { x.classList.remove("active"); });
-      document.querySelectorAll(".view").forEach(function (x) { x.classList.remove("active"); });
-      t.classList.add("active");
-      document.getElementById(t.dataset.view === "board" ? "board" : "notes-view").classList.add("active");
-    });
+    t.addEventListener("click", function () { goToView(t.dataset.view); });
   });
+
+  // --- global search (tickets + notes) ---
+  (function () {
+    var input = byId("gsearch-input"), box = byId("gsearch-results");
+    var results = [], activeIdx = -1;
+
+    function close() { box.classList.remove("open"); input.setAttribute("aria-expanded", "false"); activeIdx = -1; }
+    function open() { box.classList.add("open"); input.setAttribute("aria-expanded", "true"); }
+
+    function build(q) {
+      results = [];
+      var tHits = allTickets().filter(function (c) {
+        var hay = (c.ticketId + " " + c.title + " " + stripHTML(c.desc) + " " + (c.labels || []).join(" ")).toLowerCase();
+        return hay.indexOf(q) !== -1;
+      }).slice(0, 6).map(function (c) { return { kind: "ticket", c: c }; });
+      var nHits = (notesData || []).filter(function (n) {
+        return ((n.subject || "") + " " + stripHTML(n.body || "")).toLowerCase().indexOf(q) !== -1;
+      }).slice(0, 6).map(function (n) { return { kind: "note", n: n }; });
+      results = tHits.concat(nHits);
+    }
+
+    function paint() {
+      box.innerHTML = "";
+      if (!results.length) { var e = el("div", "gsr-empty"); e.textContent = "No matches"; box.appendChild(e); return; }
+      var lastKind = null;
+      results.forEach(function (r, i) {
+        if (r.kind !== lastKind) {
+          var g = el("div", "gsr-group"); g.textContent = r.kind === "ticket" ? "Tickets" : "Notes"; box.appendChild(g); lastKind = r.kind;
+        }
+        var item = el("div", "gsr-item" + (i === activeIdx ? " active" : "")); item.setAttribute("role", "option");
+        var title = el("div", "gsr-title");
+        if (r.kind === "ticket") {
+          var tag = el("span", "gsr-tag"); tag.textContent = r.c.ticketId; title.appendChild(tag);
+          title.appendChild(document.createTextNode(r.c.title || "Untitled"));
+          item.appendChild(title);
+          var sub = el("div", "gsr-sub");
+          sub.textContent = STATUS_TITLE[r.c.status] + (r.c.due ? " · 📅 " + fmtDate(r.c.due) : "") + (stripHTML(r.c.desc) ? " · " + stripHTML(r.c.desc).replace(/\s+/g, " ").trim() : "");
+          item.appendChild(sub);
+        } else {
+          title.appendChild(document.createTextNode((r.n.subject || "").trim() || "Untitled note"));
+          item.appendChild(title);
+          var p = stripHTML(r.n.body || "").replace(/\s+/g, " ").trim();
+          if (p) { var ns = el("div", "gsr-sub"); ns.textContent = p; item.appendChild(ns); }
+        }
+        item.addEventListener("mousedown", function (ev) { ev.preventDefault(); go(r); });
+        box.appendChild(item);
+      });
+    }
+
+    function go(r) {
+      close(); input.value = "";
+      if (r.kind === "ticket") { goToView("board"); openModal(r.c.id, r.c.status); }
+      else { goToView("notes"); renderNoteList(); openNote(r.n.id); }
+    }
+
+    input.addEventListener("input", function () {
+      var q = input.value.trim().toLowerCase();
+      if (!q) { close(); return; }
+      build(q); activeIdx = -1; paint(); open();
+    });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { close(); input.blur(); return; }
+      if (!box.classList.contains("open") || !results.length) return;
+      if (e.key === "ArrowDown") { e.preventDefault(); activeIdx = (activeIdx + 1) % results.length; paint(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); activeIdx = (activeIdx - 1 + results.length) % results.length; paint(); }
+      else if (e.key === "Enter") { e.preventDefault(); go(results[activeIdx >= 0 ? activeIdx : 0]); }
+    });
+    input.addEventListener("focus", function () { if (input.value.trim() && results.length) open(); });
+    document.addEventListener("click", function (e) { if (!e.target.closest(".gsearch")) close(); });
+  })();
 
   // --- filters ---
   function getFilters() {
@@ -1054,7 +1167,9 @@ window.__bootKanban = function () {
   }
 
   function makeCard(c, colId) {
-    var card = el("div", "card"); card.draggable = !filterOn; card.dataset.id = c.id;
+    var ds = dueState(c.due, colId);
+    var card = el("div", "card" + (ds === "overdue" ? " due-overdue" : ds === "soon" ? " due-soon" : ""));
+    card.draggable = !filterOn; card.dataset.id = c.id;
 
     var idEl = el("div", "id"); idEl.textContent = c.ticketId; card.appendChild(idEl);
     var title = el("div", "title"); title.textContent = c.title; card.appendChild(title);
@@ -1062,8 +1177,10 @@ window.__bootKanban = function () {
     var meta = el("div", "meta");
     var pr = el("span", "badge " + c.priority); pr.textContent = cap(c.priority); meta.appendChild(pr);
     if (c.due) {
-      var due = el("span", "chip due" + (isOverdue(c.due, colId) ? " overdue" : ""));
-      due.textContent = "📅 " + fmtDate(c.due); meta.appendChild(due);
+      var due = el("span", "chip due" + (ds === "overdue" ? " overdue" : ds === "soon" ? " duesoon" : ""));
+      due.textContent = (ds === "overdue" ? "⚠️ " : ds === "soon" ? "⏳ " : "📅 ") + fmtDate(c.due);
+      if (ds === "overdue") due.title = "Overdue"; else if (ds === "soon") due.title = "Due soon";
+      meta.appendChild(due);
     }
     if (c.epic) {
       var ep = el("span", "chip epic");
@@ -1145,7 +1262,8 @@ window.__bootKanban = function () {
     F.due.value = c ? c.due : "";
     F.labels.value = c ? (c.labels || []).join(", ") : "";
     populateEpicSelect(c ? c.epic : "");
-    F.comment.innerHTML = "";
+    F.comment.innerHTML = (c && c.commentDraft) ? sanitizeCommentHTML(c.commentDraft) : "";
+    showDraftStatus(c && c.commentDraft ? "Draft restored" : "");
     draftAttachments = (c && c.attachments) ? c.attachments.slice() : [];
     byId("f-link-url").value = "";
     byId("f-file-input").value = "";
@@ -1169,7 +1287,7 @@ window.__bootKanban = function () {
     lastSel = null; updateToolbarState();
     F.title.focus();
   }
-  function closeModal() { overlay.classList.remove("open"); editingId = null; editingCol = null; clearTitleError(); }
+  function closeModal() { flushCommentDraft(); overlay.classList.remove("open"); editingId = null; editingCol = null; clearTitleError(); }
 
   // --- rich description field (plain text + ⌘K links) ---
   // Old descriptions were plain text; convert them so line breaks survive.
@@ -1600,6 +1718,7 @@ window.__bootKanban = function () {
     if (!stripHTML(html).trim() && html.indexOf("<a ") === -1) return;
     (c.log = c.log || []).push({ text: "💬", html: html, at: now() });
     c.updated = now(); F.comment.innerHTML = "";
+    clearTimeout(draftTimer); draftTimer = null; delete c.commentDraft; showDraftStatus("");
     persist(); renderLog(c);
     byId("m-timestamps").textContent = "Created " + fmtDateTime(c.created) + " · Updated " + fmtDateTime(c.updated);
   });
@@ -1623,6 +1742,32 @@ window.__bootKanban = function () {
   // Ctrl/Cmd+Enter posts the comment (plain Enter makes a new line)
   F.comment.addEventListener("keydown", function (e) {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); byId("m-comment-btn").click(); }
+  });
+
+  // --- auto-saving comment drafts (per ticket) ---
+  var draftTimer = null, draftStatusTimer = null;
+  function showDraftStatus(msg) {
+    var s = byId("f-comment-draft");
+    s.textContent = msg || "";
+    s.classList.toggle("show", !!msg);
+    clearTimeout(draftStatusTimer);
+    if (msg === "Draft saved") draftStatusTimer = setTimeout(function () { s.classList.remove("show"); }, 1800);
+  }
+  function saveCommentDraft() {
+    draftTimer = null;
+    var c = editingId ? findCard(editingId) : null; if (!c) return;
+    var html = sanitizeCommentHTML(F.comment.innerHTML);
+    var hasContent = !!(stripHTML(html).trim() || html.indexOf("<a ") !== -1);
+    if (hasContent) c.commentDraft = html; else delete c.commentDraft;
+    persist();
+    showDraftStatus(hasContent ? "Draft saved" : "");
+  }
+  function flushCommentDraft() { if (draftTimer) { clearTimeout(draftTimer); saveCommentDraft(); } }
+  F.comment.addEventListener("input", function () {
+    if (!editingId) return;
+    clearTimeout(draftTimer);
+    showDraftStatus("Saving…");
+    draftTimer = setTimeout(saveCommentDraft, 600);
   });
   function updateToolbarState() {
     ["bold", "italic", "underline", "insertUnorderedList", "insertOrderedList"].forEach(function (cmd) {
@@ -2312,7 +2457,9 @@ window.__bootKanban = function () {
     for (var i = 0; i < items.length; i++) {
       if (items[i].kind === "file" && items[i].type.indexOf("image/") === 0) {
         var f = items[i].getAsFile();
-        if (f) { insertNoteImage(f); handled = true; }
+        if (f) { insertNoteImage(f); handled = true; break; } // one paste = one image
+        // The clipboard often holds several copies of the same screenshot
+        // (e.g. PNG + TIFF). Insert only the first so it isn't duplicated.
       }
     }
     if (handled) e.preventDefault(); // don't also paste the image's file path as text
@@ -2343,6 +2490,38 @@ window.__bootKanban = function () {
     lb.addEventListener("click", function () { lb.classList.remove("show"); });
     byId("note-body").addEventListener("click", function (e) {
       if (e.target && e.target.tagName === "IMG") { lbImg.src = e.target.src; lb.classList.add("show"); }
+    });
+
+    // Hover delete button: floats over the top-right of whichever note image
+    // the pointer is on, so a screenshot can be removed with one click.
+    var body = byId("note-body");
+    var delBtn = document.createElement("button");
+    delBtn.className = "note-img-delete"; delBtn.type = "button";
+    delBtn.title = "Delete image"; delBtn.textContent = "×"; // ×
+    document.body.appendChild(delBtn);
+    var targetImg = null;
+    function positionFor(img) {
+      var r = img.getBoundingClientRect();
+      delBtn.style.top = (r.top + 6) + "px";
+      delBtn.style.left = (r.right - 32) + "px";
+    }
+    function showFor(img) { targetImg = img; positionFor(img); delBtn.classList.add("show"); }
+    function hide() { targetImg = null; delBtn.classList.remove("show"); }
+    body.addEventListener("mouseover", function (e) {
+      if (e.target && e.target.tagName === "IMG") showFor(e.target);
+    });
+    body.addEventListener("mouseout", function (e) {
+      // keep the button visible while the pointer moves onto the button itself
+      if (e.relatedTarget === delBtn) return;
+      if (e.target && e.target.tagName === "IMG") hide();
+    });
+    delBtn.addEventListener("mouseleave", function () { hide(); });
+    body.addEventListener("scroll", function () { if (targetImg) positionFor(targetImg); });
+    delBtn.addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (targetImg && targetImg.parentNode) targetImg.parentNode.removeChild(targetImg);
+      hide();
+      saveActiveNote();
     });
   })();
 
