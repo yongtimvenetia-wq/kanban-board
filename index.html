@@ -96,7 +96,8 @@
     padding: 6px 8px 6px 12px; border-radius: 20px; cursor: pointer;
     background: #eef0f6; color: var(--text); border: 1px solid var(--border);
   }
-  .epic-pill:hover { border-color: #cfd5e6; }
+  .epic-pill:hover { filter: brightness(0.97); }
+  .epic-pill .ep-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
   .epic-pill .ep-name { white-space: nowrap; }
   .epic-pill .ep-track { width: 44px; height: 5px; background: #dde1ec; border-radius: 10px; overflow: hidden; }
   .epic-pill .ep-fill { display: block; height: 100%; border-radius: 10px; }
@@ -1854,6 +1855,10 @@ window.__bootKanban = function () {
       var prog = epicProgress(ep.id);
       var pill = el("span", "epic-pill");
       pill.title = "View epic details";
+      // color-code each pill by its epic color so bodies of work are distinguishable
+      pill.style.background = ep.color + "1f"; // ~12% tint
+      pill.style.borderColor = ep.color + "80"; // ~50% alpha border
+      var dot = el("span", "ep-dot"); dot.style.background = ep.color; pill.appendChild(dot);
       var nm = el("span", "ep-name"); nm.textContent = ep.name; pill.appendChild(nm);
       var track = el("span", "ep-track");
       var fill = el("span", "ep-fill"); fill.style.width = (prog.total ? prog.pct : 0) + "%"; fill.style.background = ep.color;
