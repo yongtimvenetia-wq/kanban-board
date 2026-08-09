@@ -42,9 +42,20 @@
     } catch (e) { return fallback; }
   }
 
+  // The app pushes to its cloud backend after every save. We do the same, so an
+  // import syncs to your account rather than only living in this browser.
+  function cloudPush() {
+    if (typeof window.cloudSchedulePush === "function") {
+      try { window.cloudSchedulePush(); } catch (e) {}
+    }
+  }
+
   function save(key, val) {
-    try { localStorage.setItem(key, JSON.stringify(val)); return true; }
-    catch (e) { return false; }
+    try {
+      localStorage.setItem(key, JSON.stringify(val));
+      cloudPush();
+      return true;
+    } catch (e) { return false; }
   }
 
   function uid() {
@@ -417,6 +428,7 @@
     Object.keys(d).forEach(function (k) {
       if (d[k] !== null && d[k] !== undefined) localStorage.setItem(k, JSON.stringify(d[k]));
     });
+    cloudPush();
   }
 
   function download(filename, text) {
@@ -591,7 +603,7 @@
       return;
     }
     showOk("Imported. Reloading the board…");
-    setTimeout(function () { location.reload(); }, 700);
+    setTimeout(function () { location.reload(); }, 1800);
   }
 
   function openImport() {
@@ -702,7 +714,7 @@
         try { restoreBackup(obj); }
         catch (e) { showError(e.message); return; }
         showOk("Restored. Reloading…");
-        setTimeout(function () { location.reload(); }, 700);
+        setTimeout(function () { location.reload(); }, 1800);
       };
       reader.readAsText(f);
     };
