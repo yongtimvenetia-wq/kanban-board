@@ -17,9 +17,37 @@
   "use strict";
 
   var K_CARDS = "vytzone.tickets.v2";
-  var K_NOTES = "vytzone.notes.v1";
   var K_SEQ   = "vytzone.seq.v1";
   var K_EPICS = "vytzone.epics.v1";
+
+  // Notes have been through more than one storage version. Rather than hard-code
+  // one, find the newest key that actually holds data — so a future version bump
+  // can't silently drop notes out of backups.
+  function notesKey() {
+    var best = null, bestV = -1;
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      var m = k && k.match(/^vytzone\.notes\.v(\d+)$/);
+      if (m) {
+        var v = parseInt(m[1], 10);
+        var raw = localStorage.getItem(k);
+        var populated = raw && raw !== "[]" && raw !== "null";
+        if (populated && v > bestV) { bestV = v; best = k; }
+      }
+    }
+    return best;
+  }
+
+  // Everything this app owns, so backups can't miss a key we didn't know about.
+  // The session token is deliberately excluded — it's a credential, not data.
+  function appKeys() {
+    var out = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf("vytzone.") === 0 && k.indexOf("session") === -1) out.push(k);
+    }
+    return out;
+  }
 
   var COLUMNS = ["todo", "progress", "blocked", "done"];
   var PRIORITIES = ["low", "medium", "high", "urgent"];
@@ -374,7 +402,8 @@
   function buildSummary() {
     var cards = getCards();
     var epics = load(K_EPICS, []) || [];
-    var notes = load(K_NOTES, []) || [];
+    var nk = notesKey();
+    var notes = nk ? (load(nk, []) || []) : [];
     var epicName = {};
     epics.forEach(function (e) { epicName[e.id] = e.name; });
 
@@ -408,17 +437,31 @@
   }
 
   function buildFullBackup() {
+    var data = {};
+    appKeys().forEach(function (k) {
+      var raw = localStorage.getItem(k);
+      try { data[k] = JSON.parse(raw); }
+      catch (e) { data[k] = raw; }
+    });
+    if (!(K_CARDS in data)) data[K_CARDS] = load(K_CARDS, null);
     return {
       app: "VYT's Zone",
-      backupVersion: 1,
+      backupVersion: 2,
       takenAt: nowISO(),
-      data: {
-        "vytzone.tickets.v2": load(K_CARDS, null),
-        "vytzone.notes.v1": load(K_NOTES, null),
-        "vytzone.seq.v1": load(K_SEQ, null),
-        "vytzone.epics.v1": load(K_EPICS, null)
-      }
+      keys: Object.keys(data),
+      data: data
     };
+  }
+
+  // What a backup actually contains, so the user can see it before trusting it.
+  function backupContents() {
+    var b = buildFullBackup();
+    var cards = b.data[K_CARDS] || {};
+    var tickets = COLUMNS.reduce(function (n, c) { return n + ((cards[c] || []).length); }, 0);
+    var nk = notesKey();
+    var notes = nk && Array.isArray(b.data[nk]) ? b.data[nk].length : 0;
+    var epics = Array.isArray(b.data[K_EPICS]) ? b.data[K_EPICS].length : 0;
+    return { tickets: tickets, notes: notes, epics: epics, keys: b.keys, json: JSON.stringify(b) };
   }
 
   function restoreBackup(obj) {
@@ -674,15 +717,16 @@
   // --- Backup / restore ---
 
   function openBackup() {
-    var cards = getCards();
-    var n = 0;
-    eachCard(cards, function () { n++; });
+    var c = backupContents();
+    var mb = (c.json.length / 1048576).toFixed(1);
     openModal(
       "<h2>Backup &amp; restore</h2>" +
-      '<p class="sub">Your board lives in this browser only. If you clear site data or switch browser, it\'s gone. ' +
-      "Download a backup regularly — it contains everything, including attachments and notes.</p>" +
+      '<p class="sub">This backup contains <b>' + c.tickets + " tickets</b>, <b>" + c.notes +
+      " notes</b> and <b>" + c.epics + " epics</b> — about " + mb + " MB, including attachments. " +
+      "Your board syncs to your account, but a backup also protects against mistakes sync will happily copy: " +
+      "a bad import, a bulk delete.</p>" +
       '<div class="row">' +
-        '<button id="bsync-backup" class="primary">Download full backup (' + n + ' tickets)</button>' +
+        '<button id="bsync-backup" class="primary">Download backup</button>' +
         '<button id="bsync-restore">Restore from file…</button>' +
         '<button id="bsync-cancel">Close</button>' +
       "</div>" +
@@ -691,8 +735,8 @@
     );
 
     document.getElementById("bsync-backup").onclick = function () {
-      download("vytzone-backup-" + todayStamp() + ".json", JSON.stringify(buildFullBackup()));
-      showOk("Backup downloaded.");
+      download("vytzone-backup-" + todayStamp() + ".json", c.json);
+      showOk("Backup downloaded — " + c.tickets + " tickets, " + c.notes + " notes.");
       try { localStorage.setItem("vytzone.lastBackup", nowISO()); } catch (e) {}
     };
 
@@ -763,6 +807,9 @@
     applyPlan: applyPlan,
     buildSummary: buildSummary,
     buildFullBackup: buildFullBackup,
+    backupContents: backupContents,
+    notesKey: notesKey,
+    appKeys: appKeys,
     restoreBackup: restoreBackup,
     _internals: { titleKey: titleKey, normStatus: normStatus, normPriority: normPriority, normDue: normDue }
   };
