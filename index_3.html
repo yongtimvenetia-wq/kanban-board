@@ -1,0 +1,3379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VYT's Zone</title>
+<style>
+  :root {
+    --bg: #f6f7fa;
+    --panel: #ffffff;
+    --text: #1f2733;
+    --muted: #6b7688;
+    --border: #e4e8f0;
+    --shadow: 0 1px 3px rgba(20,30,55,.08), 0 6px 18px rgba(20,30,55,.06);
+    --todo: #6366f1;
+    --progress: #f59e0b;
+    --blocked: #ef4444;
+    --done: #10b981;
+    --accent: #6366f1;
+    --p-low: #64748b;
+    --p-medium: #0ea5e9;
+    --p-high: #f59e0b;
+    --p-urgent: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex; align-items: center; gap: 22px;
+    position: sticky; top: 0; z-index: 20;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 40px; height: 40px; border-radius: 11px; flex: none;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff; font-weight: 800; font-size: 18px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand-text h1 { margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -.2px; color: var(--text); }
+  .brand-text p { margin: 1px 0 0; font-size: 12px; color: var(--muted); }
+  nav { display: flex; gap: 4px; }
+  .tab {
+    border: none; background: none; cursor: pointer;
+    padding: 8px 16px; font-size: 14px; font-weight: 600; color: var(--muted);
+    border-radius: 9px;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); background: #eef0fe; }
+  /* global search */
+  .gsearch { position: relative; margin-left: auto; }
+  .gsearch input {
+    width: 210px; max-width: 42vw; border: 1px solid var(--border); border-radius: 9px;
+    padding: 8px 11px; font-size: 13px; font-family: inherit; background: #fff; color: var(--text);
+    transition: width .15s ease, border-color .15s ease;
+  }
+  .gsearch input:focus { outline: 2px solid rgba(99,102,241,.3); border-color: var(--accent); width: 260px; }
+  .gsearch-results {
+    position: absolute; top: calc(100% + 6px); right: 0; width: 340px; max-width: 80vw;
+    max-height: 60vh; overflow-y: auto; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; box-shadow: 0 10px 30px rgba(20,30,55,.16); z-index: 40; padding: 6px; display: none;
+  }
+  .gsearch-results.open { display: block; }
+  .gsr-group { font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; color: var(--muted); padding: 8px 10px 4px; }
+  .gsr-item { padding: 8px 10px; border-radius: 8px; cursor: pointer; display: block; }
+  .gsr-item:hover, .gsr-item.active { background: var(--bg); }
+  .gsr-item .gsr-title { font-size: 13px; font-weight: 600; color: var(--text); display: flex; align-items: center; gap: 6px; }
+  .gsr-item .gsr-tag { font-size: 10px; font-weight: 700; color: var(--accent); }
+  .gsr-item .gsr-sub { font-size: 11px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gsr-empty { padding: 14px 12px; font-size: 13px; color: var(--muted); text-align: center; }
+  .saved-ind { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--muted); }
+  .saved-ind .dot-green { width: 8px; height: 8px; border-radius: 50%; background: var(--done); }
+  main { padding: 22px 28px; max-width: 1680px; margin: 0 auto; }
+  .view { display: none; }
+  .view.active { display: block; }
+
+  /* Epics bar */
+  .epics-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .epics-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-right: 4px; }
+  .epics-count { font-size: 12px; color: var(--muted); }
+  .epic-filter { border: 1px solid var(--border); border-radius: 10px; padding: 6px 10px; font-size: 13px; font-family: inherit; min-width: 180px; background: #fff; }
+  .epic-filter:focus { outline: 2px solid rgba(99,102,241,.3); border-color: var(--accent); }
+  .epics-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .epics-list.scroll { max-height: 96px; overflow-y: auto; padding: 2px; width: 100%; }
+  .epics-list.scroll::-webkit-scrollbar { width: 8px; }
+  .epics-list.scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+  .epic-pill {
+    display: inline-flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600;
+    padding: 6px 8px 6px 12px; border-radius: 20px; cursor: pointer;
+    background: #eef0f6; color: var(--text); border: 1px solid var(--border);
+  }
+  .epic-pill:hover { filter: brightness(0.97); }
+  .epic-pill .ep-dot { width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto; }
+  .epic-pill .ep-name { white-space: nowrap; }
+  .epic-pill .ep-track { width: 44px; height: 5px; background: #dde1ec; border-radius: 10px; overflow: hidden; }
+  .epic-pill .ep-fill { display: block; height: 100%; border-radius: 10px; }
+  .epic-pill .pct { color: var(--muted); font-weight: 700; font-size: 11px; }
+  .epic-pill .x { cursor: pointer; opacity: .5; font-size: 14px; line-height: 1; padding: 0 2px; color: var(--muted); }
+  .epic-pill .x:hover { opacity: 1; color: #dc2626; }
+
+  /* Epic detail */
+  .ed-dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 8px; vertical-align: middle; }
+  .progress-wrap { margin: 16px 0 8px; }
+  .progress-top { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .progress-top span:first-child { font-size: 20px; font-weight: 800; }
+  .muted-sm { font-size: 12px; color: var(--muted); }
+  .progress-track { height: 12px; background: var(--bg); border-radius: 20px; overflow: hidden; display: flex; }
+  .progress-fill { height: 100%; background: var(--done); border-radius: 20px; transition: width .4s ease; }
+  .progress-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .progress-legend .lg { display: inline-flex; align-items: center; gap: 5px; }
+  .progress-legend .lg .sw { width: 10px; height: 10px; border-radius: 3px; }
+  .ed-tickets-head { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--muted); margin: 18px 0 8px; }
+  .ed-tickets { list-style: none; padding: 0; margin: 0; max-height: 280px; overflow-y: auto; }
+  .ed-ticket { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; cursor: pointer; }
+  .ed-ticket:hover { border-color: var(--accent); background: #fafbff; }
+  .ed-ticket .et-id { font-size: 11px; font-weight: 800; color: #0891b2; min-width: 64px; letter-spacing: .3px; }
+  .ed-ticket .et-title { flex: 1; font-size: 14px; }
+  .et-unlink { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 0 4px; border-radius: 6px; }
+  .et-unlink:hover { color: #dc2626; background: #fef2f2; }
+
+  /* Confirm modal */
+  .confirm-modal { max-width: 400px; text-align: center; }
+  .confirm-icon { font-size: 34px; margin-bottom: 6px; }
+  .confirm-modal h3 { font-size: 18px; margin: 0 0 8px; }
+  .confirm-msg { color: var(--muted); font-size: 14px; line-height: 1.5; margin: 0 0 20px; }
+  .confirm-actions { justify-content: center; }
+  .btn.danger-solid { background: #dc2626; color: #fff; }
+  .btn.danger-solid:hover { background: #b91c1c; }
+  .status-tag { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 20px; color: #fff; white-space: nowrap; }
+  .status-tag.todo { background: var(--todo); }
+  .status-tag.progress { background: var(--progress); }
+  .status-tag.blocked { background: var(--blocked); }
+  .status-tag.done { background: var(--done); }
+  .ed-empty { font-size: 13px; color: var(--muted); padding: 8px 0; }
+  .epics-empty { font-size: 13px; color: var(--muted); }
+  .btn-epic-new {
+    border: 1px dashed var(--border); background: var(--panel); color: var(--accent);
+    font-size: 12px; font-weight: 700; border-radius: 20px; padding: 6px 14px; cursor: pointer;
+  }
+  .btn-epic-new:hover { border-color: var(--accent); }
+  .swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+  .swatch { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; }
+  .swatch.sel { border-color: #1f2733; }
+
+  /* Filter bar */
+  .filter-bar { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 18px; }
+  .filter-bar .flt-search {
+    flex: 1; min-width: 240px; border: 1px solid var(--border); border-radius: 14px;
+    padding: 14px 16px 14px 44px; font-size: 15px; font-family: inherit; background: #fff;
+    box-shadow: var(--shadow);
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%239aa3b2' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='11' cy='11' r='8'/><line x1='21' y1='21' x2='16.65' y2='16.65'/></svg>");
+    background-repeat: no-repeat; background-position: 16px center;
+  }
+  .filter-bar select {
+    border: 1px solid var(--border); border-radius: 12px; padding: 13px 38px 13px 16px;
+    font-size: 14px; font-family: inherit; background: #fff; cursor: pointer;
+    appearance: none; -webkit-appearance: none; -moz-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236b7688' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+    background-repeat: no-repeat; background-position: right 14px center;
+  }
+  .filter-bar input:focus, .filter-bar select:focus { outline: 2px solid rgba(99,102,241,.3); border-color: var(--accent); }
+  .flt-clear { border: 1px solid var(--border); background: #fff; color: var(--text); border-radius: 12px; padding: 13px 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+  .flt-clear:hover { border-color: var(--accent); color: var(--accent); }
+  .flt-count { font-size: 12px; color: var(--muted); width: 100%; }
+
+  /* Kanban */
+  .board { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 1000px) { .board { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .board { grid-template-columns: 1fr; } }
+  .column {
+    background: var(--panel); border-radius: 16px; box-shadow: var(--shadow);
+    display: flex; flex-direction: column;
+  }
+  .column[data-col="todo"]     { --col: var(--todo); }
+  .column[data-col="progress"] { --col: var(--progress); }
+  .column[data-col="blocked"]  { --col: var(--blocked); }
+  .column[data-col="done"]     { --col: var(--done); }
+  .col-head {
+    display: flex; align-items: center; gap: 9px;
+    padding: 16px 16px 12px; font-weight: 700; font-size: 15px;
+  }
+  .col-head .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--col); }
+  .count { font-size: 12px; color: var(--muted); background: var(--bg); padding: 2px 9px; border-radius: 20px; font-weight: 600; }
+  .col-add {
+    margin-left: auto; border: none; background: none; color: var(--muted); cursor: pointer;
+    font-size: 22px; line-height: 1; width: 30px; height: 30px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .col-add:hover { background: var(--bg); color: var(--accent); }
+  .empty-col {
+    border: 1.5px dashed var(--border); border-radius: 12px; padding: 26px 12px;
+    text-align: center; color: var(--muted); font-size: 13px; margin: 2px 4px 10px;
+  }
+  .cards {
+    padding: 4px 12px 12px; flex: 1 1 auto; min-height: 60px;
+    /* each column scrolls on its own so the page stays put */
+    max-height: max(240px, calc(100vh - 300px));
+    overflow-y: auto;
+  }
+  .cards::-webkit-scrollbar { width: 8px; }
+  .cards::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+  .cards::-webkit-scrollbar-thumb:hover { background: #cbd2de; }
+  /* on phones, let the page scroll normally instead of tiny inner panes */
+  @media (max-width: 600px) { .cards { max-height: none; overflow-y: visible; } }
+  .card {
+    background: #fff; border: 1px solid var(--border);
+    border-radius: 13px; padding: 14px; margin-bottom: 12px; cursor: grab;
+    box-shadow: 0 1px 2px rgba(20,30,55,.04); font-size: 14px; line-height: 1.4;
+    word-break: break-word; position: relative;
+    transition: box-shadow .15s ease, border-color .15s ease, transform .15s ease;
+  }
+  .card:hover { box-shadow: 0 4px 14px rgba(20,30,55,.10); border-color: #d7dbe6; }
+  .card.dragging { opacity: .45; }
+  .card .id { font-size: 11px; color: var(--accent); font-weight: 700; letter-spacing: .5px; }
+  .card .title { font-weight: 700; margin: 4px 0 10px; font-size: 15px; }
+  .card .del {
+    position: absolute; top: 6px; right: 8px; border: none; background: none;
+    color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; opacity: 0;
+    transform-origin: center; transition: transform .12s ease, color .12s ease;
+  }
+  .card:hover .del { opacity: 1; }
+  .card .del:hover { color: #ef4444; transform: scale(1.5); }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .badge { font-size: 11px; font-weight: 600; padding: 3px 9px 3px 8px; border-radius: 20px; display: inline-flex; align-items: center; gap: 5px; }
+  .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .badge.low { background: #f1f3f7; color: #64748b; }
+  .badge.medium { background: #eef0fe; color: #6366f1; }
+  .badge.high { background: #fef2f2; color: #ef4444; }
+  .badge.urgent { background: #fef2f2; color: #dc2626; }
+  .chip { font-size: 11px; padding: 3px 8px; border-radius: 7px; background: var(--bg); color: var(--muted); border: 1px solid var(--border); display: inline-flex; align-items: center; gap: 4px; }
+  .chip.epic { background: #f3e8ff; color: #7c3aed; border-color: #e9d5ff; }
+  .chip.label { background: #ecfdf5; color: #047857; border-color: #d1fae5; }
+  .chip.assignee { background: #eef2ff; color: #4338ca; border-color: #e0e7ff; }
+  .chip.due { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
+  .chip.duesoon { background: #fefce8; color: #a16207; border-color: #fde68a; }
+  .chip.overdue { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+  /* card-level due accents (left bar, no layout shift) */
+  .card.due-soon { border-left: 4px solid #f59e0b; padding-left: 11px; }
+  .card.due-overdue { border-left: 4px solid #ef4444; padding-left: 11px; }
+  .cards.drop-hint { background: rgba(99,102,241,.06); border-radius: 10px; }
+
+  /* Modal */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(20,28,48,.45); display: none;
+    align-items: flex-start; justify-content: center; z-index: 50; padding: 40px 16px; overflow-y: auto;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: #fff; border-radius: 16px; width: 100%; max-width: 560px; box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    padding: 22px 24px 24px;
+  }
+  .modal h3 { margin: 0 0 2px; font-size: 18px; }
+  .modal .sub { color: #0891b2; font-weight: 700; font-size: 12px; letter-spacing: .3px; margin-bottom: 16px; }
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .4px; }
+  .field input, .field select, .field textarea {
+    width: 100%; border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px;
+    font-size: 14px; font-family: inherit;
+  }
+  .field textarea { resize: vertical; min-height: 70px; }
+  /* rich description field (contenteditable) */
+  .field .rich {
+    width: 100%; border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px;
+    font-size: 14px; font-family: inherit; min-height: 70px; line-height: 1.5;
+    white-space: pre-wrap; overflow-wrap: anywhere; background: #fff;
+  }
+  .field .rich:focus { outline: 2px solid rgba(99,102,241,.3); border-color: var(--accent); }
+  .field .rich:empty:before { content: attr(data-placeholder); color: var(--muted); pointer-events: none; }
+  .field .rich a { color: var(--accent); text-decoration: underline; cursor: pointer; }
+  /* rendered formatting inside the description */
+  .field .rich h1 { font-size: 20px; font-weight: 800; margin: .45em 0 .3em; line-height: 1.25; }
+  .field .rich h2 { font-size: 17px; font-weight: 700; margin: .45em 0 .3em; line-height: 1.25; }
+  .field .rich h3 { font-size: 15px; font-weight: 700; margin: .45em 0 .3em; line-height: 1.25; }
+  .field .rich p { margin: .3em 0; }
+  .field .rich ul, .field .rich ol { margin: .3em 0; padding-left: 22px; }
+  .field .rich li { margin: .15em 0; }
+  .field .rich blockquote { margin: .4em 0; padding: 3px 12px; border-left: 3px solid var(--border); color: var(--muted); }
+  .field .rich code { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 5px; padding: 1px 5px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+  /* formatting toolbar */
+  .rich-toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 2px;
+    border: 1px solid var(--border); border-bottom: none; border-radius: 9px 9px 0 0;
+    background: var(--bg); padding: 5px 6px;
+  }
+  .rich-toolbar + .rich { border-radius: 0 0 9px 9px; }
+  .rt-btn {
+    border: none; background: none; cursor: pointer; min-width: 28px; height: 28px;
+    border-radius: 6px; font-size: 13px; color: var(--text); padding: 0 6px;
+    display: inline-flex; align-items: center; justify-content: center; font-family: inherit;
+  }
+  .rt-btn:hover { background: #fff; }
+  .rt-btn.active { background: #fff; color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+  .rt-btn .mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+  .rt-block { border: 1px solid var(--border); border-radius: 6px; padding: 4px 6px; font-size: 12px; font-family: inherit; background: #fff; cursor: pointer; }
+  .rt-sep { width: 1px; height: 18px; background: var(--border); margin: 0 4px; }
+  .rich-hint { font-size: 11px; color: var(--muted); margin-top: 5px; }
+  .rich-hint kbd { background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px; font-size: 11px; font-family: inherit; }
+  /* ⌘K link popover */
+  .link-pop {
+    position: fixed; z-index: 60; display: none; background: #fff; border: 1px solid var(--border);
+    border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 10px; width: 290px;
+  }
+  .link-pop label { display: block; font-size: 11px; font-weight: 700; color: var(--accent); margin-bottom: 5px; text-transform: uppercase; letter-spacing: .4px; }
+  .link-pop input { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; }
+  .link-pop .lp-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .link-pop .btn { padding: 7px 12px; font-size: 13px; }
+  .link-pop .lp-remove { margin-left: auto; }
+  /* searchable combobox (epic picker) */
+  .combo { position: relative; }
+  .combo-input { width: 100%; border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px; font-size: 14px; font-family: inherit; }
+  .combo-input:focus { outline: 2px solid rgba(99,102,241,.3); border-color: var(--accent); }
+  .combo-menu {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 5; display: none;
+    background: #fff; border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 12px 30px rgba(0,0,0,.16); max-height: 240px; overflow-y: auto; padding: 4px;
+  }
+  .combo-menu.open { display: block; }
+  .combo-opt { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 7px; cursor: pointer; font-size: 14px; }
+  .combo-opt.active { background: rgba(99,102,241,.1); }
+  .combo-dot { width: 11px; height: 11px; border-radius: 50%; flex: none; }
+  .combo-txt { flex: 1; }
+  .combo-check { color: var(--accent); font-weight: 700; }
+  .combo-create { color: var(--accent); font-weight: 600; }
+  .combo-none { color: var(--muted); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 480px) { .row2, .row3 { grid-template-columns: 1fr; } }
+  input:focus, select:focus, textarea:focus { outline: 2px solid rgba(99,102,241,.3); border-color: var(--accent); }
+  .error { display: none; color: #dc2626; font-size: 12px; font-weight: 600; margin-top: 6px; }
+  .error.show { display: block; }
+  input.invalid { border-color: #dc2626; }
+  input.invalid:focus { outline-color: rgba(220,38,38,.3); }
+  .modal-actions { display: flex; gap: 10px; margin-top: 8px; align-items: center; }
+  .btn { border: none; border-radius: 9px; padding: 10px 18px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn.ghost { background: var(--bg); color: var(--text); }
+  .btn.danger { background: none; color: #ef4444; margin-left: auto; }
+  .m-saved { font-size: 12px; font-weight: 700; color: var(--done); opacity: 0; transition: opacity .3s; }
+  .m-saved.show { opacity: 1; }
+  /* Attachments */
+  .dropzone {
+    border: 2px dashed var(--border); border-radius: 10px; padding: 16px; text-align: center;
+    display: flex; flex-direction: column; align-items: center; gap: 8px; transition: all .15s;
+  }
+  .dropzone.dragover { border-color: var(--accent); background: rgba(99,102,241,.06); }
+  .dropzone .dz-text { font-size: 13px; color: var(--muted); }
+  .btn-attach { border: 1px solid var(--accent); background: #fff; color: var(--accent); border-radius: 9px; padding: 7px 14px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .btn-attach:hover { background: var(--accent); color: #fff; }
+  .link-row { display: flex; gap: 8px; margin-top: 10px; }
+  .link-row input { flex: 1; border: 1px solid var(--border); border-radius: 9px; padding: 8px 11px; font-size: 13px; font-family: inherit; }
+  .attach-list { list-style: none; padding: 0; margin: 10px 0 0; }
+  .attach-item { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; margin-bottom: 8px; }
+  .attach-item img.thumb { width: 38px; height: 38px; object-fit: cover; border-radius: 6px; border: 1px solid var(--border); }
+  .attach-item .ic { width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; background: var(--bg); border-radius: 6px; font-size: 18px; }
+  .attach-item .a-name { flex: 1; font-size: 13px; word-break: break-all; }
+  .attach-item .a-name a { color: var(--accent); text-decoration: none; }
+  .attach-item .a-name a:hover { text-decoration: underline; }
+  .attach-item .a-size { font-size: 11px; color: var(--muted); }
+  .attach-item .a-del { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 0 4px; }
+  .attach-item .a-del:hover { color: #dc2626; }
+  .chip.attach { background: #f1f5f9; color: #475569; border-color: #e2e8f0; }
+  .chip.links { background: #eef2ff; color: #4338ca; border-color: #e0e7ff; }
+
+  /* Linked tickets list */
+  .link-row .linksearch { flex: 1; min-width: 0; border: 1px solid var(--border); border-radius: 9px; padding: 8px 11px; font-size: 13px; font-family: inherit; }
+  .link-row #f-linksel { flex: 1; min-width: 0; }
+  .link-row #f-link-add { white-space: nowrap; }
+  .linked-list { list-style: none; padding: 0; margin: 10px 0 0; }
+  .linked-item { display: flex; align-items: center; gap: 10px; border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; margin-bottom: 8px; }
+  .linked-item .l-id { font-size: 11px; font-weight: 800; color: #0891b2; min-width: 62px; letter-spacing: .3px; }
+  .linked-item .l-title { flex: 1; font-size: 13px; cursor: pointer; }
+  .linked-item .l-title:hover { color: var(--accent); text-decoration: underline; }
+  .linked-item .l-del { border: none; background: none; color: var(--muted); cursor: pointer; font-size: 18px; line-height: 1; padding: 0 4px; }
+  .linked-item .l-del:hover { color: #dc2626; }
+
+  .activity { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .activity h4 { margin: 0; font-size: 13px; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 6px; }
+  .activity h4 .caret { display: inline-block; transition: transform .15s; font-size: 18px; line-height: 1; color: var(--accent); }
+  .activity:not(.collapsed) h4 .caret { transform: rotate(90deg); }
+  .activity .activity-body { margin-top: 10px; }
+  .activity.collapsed .activity-body { display: none; }
+  .log { list-style: none; padding: 0; margin: 0 0 12px; max-height: 150px; overflow-y: auto; }
+  .log li { font-size: 12px; color: var(--muted); padding: 4px 0; border-bottom: 1px dashed var(--border); }
+  .log li .who { color: var(--text); font-weight: 600; }
+  .comment-section { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 14px; }
+  .comment-section .section-label { margin: 0 0 10px; font-size: 13px; }
+  .comment-row { display: flex; gap: 8px; }
+  .comment-row input { flex: 1; }
+  .comment-editor { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--panel); }
+  .comment-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; padding: 6px 8px; border-bottom: 1px solid var(--border); background: var(--bg); }
+  .ct-btn { border: 1px solid transparent; background: none; color: var(--text); cursor: pointer; font-size: 12px; line-height: 1; padding: 5px 8px; border-radius: 6px; min-width: 28px; }
+  .ct-btn:hover { background: var(--panel); border-color: var(--border); }
+  .ct-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .ct-sep { width: 1px; align-self: stretch; background: var(--border); margin: 2px 4px; }
+  /* Font-color button + swatch palette */
+  .ct-color-wrap { position: relative; display: inline-flex; }
+  .ct-color-a { font-weight: 800; border-bottom: 3px solid var(--ct-color-current, #ef4444); padding-bottom: 1px; line-height: 1; }
+  .ct-color-pop { position: absolute; top: 100%; left: 0; margin-top: 4px; z-index: 60; display: none; background: #fff; border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 6px 20px rgba(20,28,48,.15); padding: 8px; }
+  .ct-color-pop.show { display: block; }
+  .ct-swatches { display: grid; grid-template-columns: repeat(5, 22px); gap: 6px; }
+  .ct-swatch { width: 22px; height: 22px; border-radius: 6px; border: 1px solid rgba(0,0,0,.12); cursor: pointer; padding: 0; position: relative; }
+  .ct-swatch:hover { transform: scale(1.08); }
+  .ct-swatch.ct-default { background: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--text); font-weight: 700; }
+  .ct-table-tools .ct-btn { font-size: 11px; padding: 5px 6px; min-width: 0; }
+  /* Tables inside notes */
+  .note-body table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 14px; }
+  .note-body table td, .note-body table th { border: 1px solid var(--border); padding: 7px 10px; min-width: 40px; vertical-align: top; text-align: left; }
+  .note-body table th { background: var(--bg); font-weight: 700; }
+  .note-body table tr:nth-child(even) td { background: rgba(99,102,241,.03); }
+  .note-body table td:focus, .note-body table th:focus { outline: 2px solid rgba(99,102,241,.35); outline-offset: -2px; }
+  .ct-clear { display: inline-flex; align-items: center; justify-content: center; }
+  .ct-clear svg { display: block; }
+  .comment-input { min-height: 64px; max-height: 200px; overflow-y: auto; overflow-x: hidden; overflow-wrap: anywhere; word-break: break-word; padding: 10px 12px; font-size: 13px; color: var(--text); outline: none; }
+  .comment-input:empty:before { content: attr(data-placeholder); color: var(--muted); }
+  .comment-input p { margin: 0 0 6px; }
+  .comment-input ul, .comment-input ol { margin: 4px 0; padding-left: 22px; }
+  .comment-input a { color: var(--accent); }
+  .comment-actions { display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; border-top: 1px solid var(--border); background: var(--bg); }
+  .draft-status { font-size: 11px; color: var(--muted); opacity: 0; transition: opacity .3s ease; padding-left: 4px; }
+  .draft-status.show { opacity: 1; }
+  .log li .comment-body { color: var(--text); }
+  .log li .comment-body ul, .log li .comment-body ol { margin: 4px 0; padding-left: 20px; }
+  .log li .comment-body a { color: var(--accent); }
+  .log li .comment-body p { margin: 0 0 4px; }
+  .timestamps { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* Notes */
+  .notes-panel { background: var(--panel); border-radius: 14px; box-shadow: var(--shadow); padding: 18px; }
+  .notes-top-bar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+  .notes-top-bar .note-search { flex: 1 1 220px; }
+  .notes-panel .note-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; list-style: none; margin: 0; padding: 0; }
+  .notes-panel .note-list-item { margin-bottom: 0; }
+  .notes-panel .note-list-empty { grid-column: 1 / -1; }
+  .note-modal { max-width: 820px; }
+  .note-modal .note-body { max-height: calc(100vh - 360px); }
+  .notes-app { display: flex; gap: 16px; align-items: flex-start; }
+  .notes-sidebar { flex: 0 0 280px; background: var(--panel); border-radius: 14px; box-shadow: var(--shadow); padding: 14px; max-height: calc(100vh - 150px); display: flex; flex-direction: column; }
+  .notes-side-top { margin-bottom: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .notes-side-top .btn { width: 100%; }
+  .meeting-help { font-size: 13px; color: var(--muted); line-height: 1.5; margin: 4px 0 16px; }
+  .meeting-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text); margin: 2px 0 4px; cursor: pointer; }
+  .meeting-check input { width: 16px; height: 16px; accent-color: var(--accent); }
+  .notes-side-tools { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+  .note-search, .note-sort { width: 100%; border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; font-size: 13px; font-family: inherit; background: #fff; color: var(--text); }
+  .note-search:focus, .note-sort:focus { outline: 2px solid rgba(99,102,241,.3); border-color: var(--accent); }
+  .note-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+  .note-list-item { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; transition: border-color .12s, background .12s; }
+  .note-list-item:hover { border-color: var(--accent); background: #fafbff; }
+  .note-list-item.active { border-color: var(--accent); background: #eef0fe; }
+  .nli-top { display: flex; align-items: center; gap: 8px; }
+  .nli-title { font-size: 13px; font-weight: 700; color: var(--text); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nli-title.untitled { color: var(--muted); font-weight: 600; font-style: italic; }
+  .nli-preview { font-size: 12px; color: var(--muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nli-foot { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .nli-date { font-size: 11px; color: var(--muted); }
+  .nli-todo { font-size: 11px; color: var(--muted); margin-left: auto; }
+  .note-list-empty { font-size: 13px; color: var(--muted); padding: 14px 4px; text-align: center; }
+
+  .notes-main { flex: 1; min-width: 0; background: var(--panel); border-radius: 14px; box-shadow: var(--shadow); padding: 18px; min-height: 460px; }
+  .note-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; min-height: 420px; color: var(--muted); }
+  .note-empty-art { font-size: 44px; }
+  .note-empty p { margin: 0; font-size: 14px; }
+  .note-editor-head { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+  .note-subject { flex: 1 1 200px; min-width: 0; border: none; border-bottom: 2px solid var(--border); border-radius: 0; padding: 6px 2px; font-size: 19px; font-weight: 700; font-family: inherit; color: var(--text); background: none; resize: none; overflow: hidden; line-height: 1.3; white-space: pre-wrap; overflow-wrap: anywhere; word-break: break-word; }
+  .note-subject:focus { outline: none; border-bottom-color: var(--accent); }
+  .note-priority-sel { border: 1px solid var(--border); border-radius: 9px; padding: 8px 10px; font-size: 13px; font-family: inherit; background: #fff; color: var(--text); }
+  .note-editor-head .btn.danger { margin-left: 0; padding: 8px 12px; }
+  #note-to-ticket { padding: 8px 12px; font-weight: 700; }
+  #note-toolbar { border: 1px solid var(--border); border-bottom: none; border-radius: 10px 10px 0 0; }
+  .note-body { border: 1px solid var(--border); border-radius: 0 0 10px 10px; min-height: 320px; max-height: calc(100vh - 320px); overflow-y: auto; overflow-x: hidden; overflow-wrap: anywhere; word-break: break-word; padding: 16px; font-size: 15px; line-height: 1.65; color: var(--text); outline: none; }
+  .note-body:empty:before { content: attr(data-placeholder); color: var(--muted); }
+  .note-body ul, .note-body ol { margin: 6px 0; padding-left: 24px; }
+  /* Nested lists (sub-items via Tab) get their own margers so each level reads clearly */
+  .note-body ul ul { list-style-type: circle; }
+  .note-body ul ul ul { list-style-type: square; }
+  .note-body ol ol { list-style-type: lower-alpha; }
+  .note-body ol ol ol { list-style-type: lower-roman; }
+  .note-body li ul, .note-body li ol { margin: 2px 0; }
+  .note-body h1 { font-size: 24px; font-weight: 800; margin: 14px 0 8px; line-height: 1.25; }
+  .note-body h2 { font-size: 19px; font-weight: 700; margin: 12px 0 6px; line-height: 1.3; }
+  .note-body h3 { font-size: 16px; font-weight: 700; margin: 10px 0 4px; color: var(--muted); text-transform: none; }
+  .note-body h1:first-child, .note-body h2:first-child, .note-body h3:first-child { margin-top: 0; }
+  .note-body a { color: var(--accent); }
+  .note-body img { max-width: 100%; height: auto; display: block; border-radius: 8px; border: 1px solid var(--border); margin: 8px 0; cursor: zoom-in; }
+  .note-img-lightbox { position: fixed; inset: 0; z-index: 2000; display: none; align-items: center; justify-content: center; background: rgba(15,20,35,.8); padding: 30px; cursor: zoom-out; }
+  .note-img-lightbox.show { display: flex; }
+  .note-img-lightbox img { max-width: 96vw; max-height: 92vh; border-radius: 10px; box-shadow: 0 10px 40px rgba(0,0,0,.5); }
+  .note-img-delete { position: fixed; z-index: 2100; display: none; width: 26px; height: 26px; padding: 0; border: none; border-radius: 50%; background: rgba(20,25,40,.85); color: #fff; font-size: 16px; line-height: 26px; text-align: center; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+  .note-img-delete:hover { background: #e0413a; }
+  .note-img-delete.show { display: block; }
+  .note-body .todo { display: flex; align-items: flex-start; gap: 8px; margin: 4px 0; }
+  .note-body .todo input[type=checkbox] { margin-top: 4px; width: 16px; height: 16px; flex: 0 0 auto; cursor: pointer; accent-color: var(--accent); }
+  .note-body .todo.done .todo-text { text-decoration: line-through; color: var(--muted); }
+  .todo-text { flex: 1; min-width: 0; overflow-wrap: anywhere; word-break: break-word; }
+  .note-meta { font-size: 11px; color: var(--muted); margin-top: 10px; min-height: 14px; }
+  .note-meta .meta-saved { color: var(--done); }
+
+  /* Notion-style block gutter: hover any line to add or drag it */
+  .note-body { padding-left: 52px; }
+  .note-block-tools { position: fixed; z-index: 1300; display: none; gap: 2px; align-items: center; padding: 2px; background: #fff; border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 2px 8px rgba(20,28,48,.12); }
+  .note-block-tools.show { display: flex; }
+  .note-block-tools > div { width: 20px; height: 22px; display: flex; align-items: center; justify-content: center; border-radius: 5px; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; user-select: none; -webkit-user-select: none; }
+  .note-block-tools > div:hover { background: #eef0fe; color: var(--accent); }
+  .nbt-add { font-weight: 700; }
+  .nbt-drag { cursor: grab; letter-spacing: -3px; font-size: 14px; padding-right: 3px; }
+  .nbt-drag:active { cursor: grabbing; }
+  .note-drop-line { position: fixed; z-index: 1300; height: 3px; background: var(--accent); border-radius: 2px; display: none; pointer-events: none; box-shadow: 0 0 0 1px rgba(99,102,241,.25); }
+  .note-drop-line.show { display: block; }
+  .nb-dragging { opacity: .4; }
+
+  /* ---------- Note table of contents (left sidebar) ---------- */
+  .note-modal.toc-open { max-width: 1040px; }
+  .note-layout { display: flex; gap: 12px; align-items: stretch; }
+  .note-main-col { flex: 1; min-width: 0; }
+  .note-toc { flex: 0 0 36px; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); overflow: hidden; transition: flex-basis .18s ease; }
+  .note-toc.open { flex-basis: 210px; }
+  .note-toc-head { display: flex; align-items: center; gap: 6px; padding: 5px; border-bottom: 1px solid transparent; }
+  .note-toc.open .note-toc-head { border-bottom-color: var(--border); padding: 5px 5px 5px 10px; }
+  .note-toc-title { display: none; flex: 1; font-size: 13px; font-weight: 700; color: var(--text); }
+  .note-toc.open .note-toc-title { display: block; }
+  .note-toc-toggle { flex: 0 0 auto; width: 26px; height: 26px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; padding: 0; }
+  .note-toc-toggle:hover { background: var(--panel); border-color: var(--border); color: var(--accent); }
+  .note-toc-toggle:focus-visible, .note-toc-link:focus-visible { outline: 2px solid rgba(99,102,241,.45); outline-offset: 1px; }
+  .note-toc-count { position: absolute; top: -4px; right: -5px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 9px; font-weight: 700; line-height: 15px; text-align: center; }
+  .note-toc.open .note-toc-count, .note-toc-count:empty { display: none; }
+  .note-toc-list { display: none; list-style: none; margin: 0; padding: 6px; overflow-y: auto; max-height: calc(100vh - 360px); }
+  .note-toc.open .note-toc-list { display: block; }
+  .note-toc-link { display: block; width: 100%; text-align: left; border: none; background: none; font-family: inherit; font-size: 13px; line-height: 1.35; color: var(--text); padding: 5px 8px; border-radius: 6px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-left: 2px solid transparent; }
+  .note-toc-link:hover { background: #eef0fe; color: var(--accent); }
+  .note-toc-link.current { border-left-color: var(--accent); color: var(--accent); background: #eef0fe; }
+  .note-toc-link.lvl-1 { font-weight: 700; }
+  .note-toc-link.lvl-2 { padding-left: 20px; }
+  .note-toc-link.lvl-3 { padding-left: 32px; color: var(--muted); font-size: 12px; }
+  .note-toc-link.lvl-3:hover, .note-toc-link.lvl-3.current { color: var(--accent); }
+  .note-toc-empty { font-size: 12px; color: var(--muted); padding: 8px; line-height: 1.45; }
+  .note-body .toc-flash { background: rgba(99,102,241,.12); border-radius: 4px; transition: background 1s ease; }
+  @media (max-width: 700px) {
+    .note-layout { flex-direction: column; }
+    .note-toc, .note-toc.open { flex-basis: auto; }
+    .note-toc-list { max-height: 200px; }
+    .note-toc-title { display: block; }
+  }
+  @media (prefers-reduced-motion: reduce) { .note-toc { transition: none; } .note-body .toc-flash { transition: none; } }
+
+  @media (max-width: 900px) {
+    .notes-app { flex-direction: column; }
+    .notes-sidebar { flex: none; width: 100%; max-height: 260px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">V</div>
+    <div class="brand-text">
+      <h1>VYT's Zone</h1>
+      <p>Kanban board &amp; notes</p>
+    </div>
+  </div>
+  <nav>
+    <button class="tab active" data-view="board">Board</button>
+    <button class="tab" data-view="notes">Notes</button>
+  </nav>
+  <div class="gsearch">
+    <input id="gsearch-input" type="text" placeholder="🔍 Search everything…" autocomplete="off" role="combobox" aria-expanded="false" aria-controls="gsearch-results">
+    <div class="gsearch-results" id="gsearch-results" role="listbox"></div>
+  </div>
+  <div class="saved-ind"><span class="dot-green"></span> Saved locally</div>
+</header>
+
+<main>
+  <section class="view active" id="board">
+    <div class="epics-bar">
+      <span class="epics-label">Epics</span>
+      <input id="epic-filter" class="epic-filter" placeholder="🔍 Filter epics…">
+      <div class="epics-list" id="epics-list"></div>
+      <button class="btn-epic-new" id="new-epic-btn">+ New epic</button>
+      <span class="epics-count" id="epics-count"></span>
+    </div>
+
+    <div class="filter-bar">
+      <input id="flt-search" class="flt-search" placeholder="Search by title, description, or label…">
+      <select id="flt-priority"><option value="">All priorities</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select>
+      <select id="flt-epic"><option value="">All epics</option></select>
+      <select id="flt-label"><option value="">All labels</option></select>
+      <button class="flt-clear" id="flt-clear">Clear</button>
+      <span class="flt-count" id="flt-count"></span>
+    </div>
+
+    <div class="board" id="kanban"></div>
+  </section>
+
+  <section class="view" id="notes-view">
+    <div class="notes-panel">
+      <div class="notes-top-bar">
+        <button class="btn primary" id="note-new">+ New note</button>
+        <button class="btn ghost" id="note-meeting">🎙 Meeting note</button>
+        <input id="note-search" class="note-search" placeholder="Search notes…">
+        <select id="note-sort" class="note-sort">
+          <option value="updated">Recently updated</option>
+          <option value="created">Newest first</option>
+          <option value="subject">Subject A–Z</option>
+          <option value="priority">Priority</option>
+        </select>
+      </div>
+      <ul class="note-list" id="note-list"></ul>
+    </div>
+  </section>
+
+<!-- Note editor modal -->
+<div class="overlay" id="note-overlay">
+  <div class="modal note-modal">
+        <div class="note-editor" id="note-editor">
+          <div class="note-editor-head">
+            <textarea id="note-subject" class="note-subject" rows="1" placeholder="Note subject…"></textarea>
+            <select id="note-priority" class="note-priority-sel">
+              <option value="">No priority</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+            <button class="btn ghost" id="note-to-ticket" title="Create a board ticket from this note">↗ Create ticket</button>
+            <button class="btn danger" id="note-delete" title="Delete note">Delete</button>
+          </div>
+          <div class="note-layout">
+          <aside class="note-toc" id="note-toc" aria-label="Table of contents">
+            <div class="note-toc-head">
+              <button type="button" class="note-toc-toggle" id="note-toc-toggle" aria-expanded="false" aria-controls="note-toc-list" title="Show table of contents">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M8 12h12"/><path d="M12 18h8"/></svg>
+                <span class="note-toc-count" id="note-toc-count"></span>
+              </button>
+              <span class="note-toc-title">Contents</span>
+            </div>
+            <ul class="note-toc-list" id="note-toc-list"></ul>
+          </aside>
+          <div class="note-main-col">
+          <div class="comment-toolbar" id="note-toolbar">
+            <button type="button" class="ct-btn" data-cmd="h1" title="Heading 1">H1</button>
+            <button type="button" class="ct-btn" data-cmd="h2" title="Heading 2">H2</button>
+            <button type="button" class="ct-btn" data-cmd="h3" title="Heading 3">H3</button>
+            <span class="ct-sep"></span>
+            <button type="button" class="ct-btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+            <button type="button" class="ct-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+            <button type="button" class="ct-btn" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+            <span class="ct-sep"></span>
+            <button type="button" class="ct-btn" data-cmd="insertUnorderedList" title="Bullet list">&bull;&#8202;List</button>
+            <button type="button" class="ct-btn" data-cmd="insertOrderedList" title="Numbered list">1.&#8202;List</button>
+            <button type="button" class="ct-btn" data-cmd="checkbox" title="Checklist item">&#9745;&#8202;To-do</button>
+            <span class="ct-sep"></span>
+            <div class="ct-color-wrap">
+              <button type="button" class="ct-btn" data-cmd="color" title="Font color" aria-label="Font color"><span class="ct-color-a">A</span></button>
+              <div class="ct-color-pop" id="note-color-pop">
+                <div class="ct-swatches"></div>
+              </div>
+            </div>
+            <button type="button" class="ct-btn" data-cmd="insertTable" title="Insert table">&#9638;&#8202;Table</button>
+            <span class="ct-sep"></span>
+            <button type="button" class="ct-btn" data-cmd="createLink" title="Insert link">🔗 Link</button>
+            <button type="button" class="ct-btn ct-clear" data-cmd="removeFormat" title="Clear formatting — removes bold, headings, lists and links from the selected text" aria-label="Clear formatting"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.24 3.56l4.2 4.2a1.5 1.5 0 0 1 0 2.12L11.66 18.6a2 2 0 0 1-2.83 0L4.1 13.86a1.5 1.5 0 0 1 0-2.12l8.02-8.18a1.5 1.5 0 0 1 2.12 0z"/><path d="M9 18.6H20"/></svg></button>
+            <span class="ct-sep ct-table-tools" style="display:none"></span>
+            <span class="ct-table-tools" style="display:none">
+              <button type="button" class="ct-btn" data-cmd="rowAbove" title="Insert row above">↑+ Row</button>
+              <button type="button" class="ct-btn" data-cmd="rowBelow" title="Insert row below">↓+ Row</button>
+              <button type="button" class="ct-btn" data-cmd="colLeft" title="Insert column left">←+ Col</button>
+              <button type="button" class="ct-btn" data-cmd="colRight" title="Insert column right">+→ Col</button>
+              <button type="button" class="ct-btn ct-clear" data-cmd="delRow" title="Delete current row">✕ Row</button>
+              <button type="button" class="ct-btn ct-clear" data-cmd="delCol" title="Delete current column">✕ Col</button>
+              <button type="button" class="ct-btn ct-clear" data-cmd="delTable" title="Delete table">🗑 Table</button>
+            </span>
+          </div>
+          <div id="note-body" class="note-body" contenteditable="true" data-placeholder="Start writing… use the toolbar to add lists, checkboxes and links."></div>
+          <div class="note-meta" id="note-meta"></div>
+          </div>
+          </div>
+        </div>
+    <div class="modal-actions">
+      <button class="btn ghost" id="note-close">Close</button>
+    </div>
+  </div>
+</div>
+</main>
+
+<!-- Ticket modal -->
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h3 id="m-heading">New ticket</h3>
+    <div class="sub" id="m-id"></div>
+
+    <div class="field">
+      <label>Title</label>
+      <input id="f-title" placeholder="Short summary of the work">
+      <div class="error" id="f-title-error">Please enter a title before saving.</div>
+    </div>
+
+    <div id="m-extra-fields">
+      <div class="field">
+        <label>Description</label>
+        <div class="rich-toolbar" id="f-desc-toolbar">
+          <select class="rt-block" id="rt-block" title="Text style">
+            <option value="p">Normal</option>
+            <option value="h1">Heading 1</option>
+            <option value="h2">Heading 2</option>
+            <option value="h3">Heading 3</option>
+          </select>
+          <span class="rt-sep"></span>
+          <button type="button" class="rt-btn" data-cmd="bold" title="Bold (⌘B)"><b>B</b></button>
+          <button type="button" class="rt-btn" data-cmd="italic" title="Italic (⌘I)"><i>I</i></button>
+          <button type="button" class="rt-btn" data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
+          <button type="button" class="rt-btn" data-cmd="code" title="Inline code"><span class="mono">&lt;/&gt;</span></button>
+          <span class="rt-sep"></span>
+          <button type="button" class="rt-btn" data-cmd="insertUnorderedList" title="Bulleted list">≡</button>
+          <button type="button" class="rt-btn" data-cmd="insertOrderedList" title="Numbered list"><span class="mono">1.</span></button>
+          <button type="button" class="rt-btn" data-cmd="quote" title="Quote">❝</button>
+          <span class="rt-sep"></span>
+          <button type="button" class="rt-btn" data-cmd="link" title="Add link (⌘K)">🔗</button>
+        </div>
+        <div id="f-desc" class="rich" contenteditable="true" data-placeholder="Details, context, acceptance criteria…"></div>
+        <div class="rich-hint">Use the toolbar to format · select text and press <kbd>⌘K</kbd> to add a link · click a link to open it</div>
+      </div>
+      <div class="row3">
+        <div class="field">
+          <label>Priority</label>
+          <select id="f-priority">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="f-status">
+            <option value="todo">To Do</option>
+            <option value="progress">In Progress</option>
+            <option value="blocked">Blocked</option>
+            <option value="done">Done</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Due date</label>
+          <input id="f-due" type="date">
+        </div>
+      </div>
+      <div class="row2">
+        <div class="field">
+          <label>Labels</label>
+          <input id="f-labels" placeholder="comma, separated">
+        </div>
+        <div class="field">
+          <label>Epic (optional)</label>
+          <div class="combo" id="epic-combo">
+            <input id="f-epic-input" class="combo-input" placeholder="Search or create an epic…" autocomplete="off">
+            <input type="hidden" id="f-epic">
+            <div class="combo-menu" id="epic-menu"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Linked tickets (optional)</label>
+        <div class="link-row">
+          <input id="f-linksearch" class="linksearch" placeholder="🔍 Search…">
+          <select id="f-linksel"><option value="">Select a ticket to link…</option></select>
+          <button type="button" class="btn ghost" id="f-link-add">Link</button>
+        </div>
+        <ul class="linked-list" id="f-linked-list"></ul>
+      </div>
+
+      <div class="field">
+        <label>Attachments (optional)</label>
+        <div class="dropzone" id="f-dropzone">
+          <div class="dz-text">Drag &amp; drop files here</div>
+          <button type="button" class="btn-attach" id="f-attach-btn">📎 Attach file</button>
+          <input type="file" id="f-file-input" multiple hidden>
+        </div>
+        <div class="link-row">
+          <input id="f-link-url" placeholder="Or paste a website link (https://…)">
+          <button type="button" class="btn ghost" id="f-link-btn">Add link</button>
+        </div>
+        <ul class="attach-list" id="f-attach-list"></ul>
+      </div>
+    </div>
+
+    <div class="timestamps" id="m-timestamps"></div>
+
+    <div class="comment-section" id="m-comment-section" style="display:none">
+      <h4 class="section-label">Comment</h4>
+      <div class="comment-editor">
+        <div class="comment-toolbar" id="f-comment-toolbar">
+          <button type="button" class="ct-btn" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button type="button" class="ct-btn" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+          <button type="button" class="ct-btn" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+          <span class="ct-sep"></span>
+          <button type="button" class="ct-btn" data-cmd="insertUnorderedList" title="Bullet list">&bull;&#8202;List</button>
+          <button type="button" class="ct-btn" data-cmd="insertOrderedList" title="Numbered list">1.&#8202;List</button>
+          <span class="ct-sep"></span>
+          <button type="button" class="ct-btn" data-cmd="createLink" title="Insert link">🔗 Link</button>
+          <button type="button" class="ct-btn ct-clear" data-cmd="removeFormat" title="Clear formatting — removes bold, headings, lists and links from the selected text" aria-label="Clear formatting"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.24 3.56l4.2 4.2a1.5 1.5 0 0 1 0 2.12L11.66 18.6a2 2 0 0 1-2.83 0L4.1 13.86a1.5 1.5 0 0 1 0-2.12l8.02-8.18a1.5 1.5 0 0 1 2.12 0z"/><path d="M9 18.6H20"/></svg></button>
+        </div>
+        <div id="f-comment" class="comment-input" contenteditable="true" data-placeholder="Add a comment…"></div>
+        <div class="comment-actions">
+          <span class="draft-status" id="f-comment-draft"></span>
+          <button class="btn ghost" id="m-comment-btn">Post</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="activity collapsed" id="m-activity" style="display:none">
+      <h4 id="m-activity-toggle"><span class="caret">▸</span> History</h4>
+      <div class="activity-body">
+        <ul class="log" id="m-log"></ul>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <span class="m-saved" id="m-saved">Saved ✓</span>
+      <button class="btn ghost" id="m-cancel">Close</button>
+      <button class="btn danger" id="m-delete" style="display:none">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Epic modal -->
+<div class="overlay" id="epic-overlay">
+  <div class="modal" style="max-width:440px">
+    <h3>New epic</h3>
+    <div class="sub">Epics are optional categories you can group tickets under.</div>
+
+    <div class="field">
+      <label>Name</label>
+      <input id="e-name" placeholder="e.g. Q3 Launch">
+      <div class="error" id="e-name-error">Please enter an epic name.</div>
+    </div>
+    <div class="field">
+      <label>Description (optional)</label>
+      <textarea id="e-desc" placeholder="What does this epic cover?"></textarea>
+    </div>
+    <div class="field">
+      <label>Color</label>
+      <div class="swatches" id="e-swatches"></div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn primary" id="e-save">Save epic</button>
+      <button class="btn ghost" id="e-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Epic detail modal -->
+<div class="overlay" id="epic-detail-overlay">
+  <div class="modal" style="max-width:560px">
+    <h3 id="ed-name"><span class="ed-dot" id="ed-dot"></span><span id="ed-title"></span></h3>
+    <div class="sub" id="ed-desc"></div>
+
+    <div class="progress-wrap">
+      <div class="progress-top">
+        <span id="ed-pct">0% complete</span>
+        <span id="ed-counts" class="muted-sm"></span>
+      </div>
+      <div class="progress-track"><div class="progress-fill" id="ed-fill"></div></div>
+      <div class="progress-legend" id="ed-legend"></div>
+    </div>
+
+    <div class="ed-tickets-head">Linked tickets</div>
+    <ul class="ed-tickets" id="ed-tickets"></ul>
+
+    <div class="modal-actions">
+      <button class="btn ghost" id="ed-close">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⌘K link popover -->
+<div class="link-pop" id="link-pop">
+  <label for="lp-url">Link URL</label>
+  <input id="lp-url" placeholder="Paste a link, then press Enter">
+  <div class="lp-actions">
+    <button class="btn primary" id="lp-apply">Apply</button>
+    <button class="btn ghost lp-remove" id="lp-remove" style="display:none">Remove link</button>
+  </div>
+</div>
+
+<!-- Confirm modal -->
+<div class="overlay" id="confirm-overlay">
+  <div class="modal confirm-modal">
+    <div class="confirm-icon">⚠️</div>
+    <h3 id="c-heading">Are you sure you want to delete?</h3>
+    <p class="confirm-msg" id="c-msg"></p>
+    <div class="modal-actions confirm-actions">
+      <button class="btn ghost" id="c-cancel">Cancel</button>
+      <button class="btn danger-solid" id="c-confirm">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Meeting note import modal -->
+<div class="overlay" id="meeting-overlay">
+  <div class="modal" style="max-width:600px">
+    <h3>New meeting note</h3>
+    <div class="sub">Summary · action-item checklist · transcript</div>
+    <p class="meeting-help">Granola records and transcribes your Teams call. Ask Claude to <em>“summarise my last meeting as a meeting note”</em>, then paste the result below, and it becomes a note with a summary, a checklist of action items and the full transcript.</p>
+    <div class="field">
+      <label>Subject (optional)</label>
+      <input id="meeting-subject" placeholder="e.g. Weekly sync — 18 Jun">
+    </div>
+    <div class="field">
+      <label>Meeting content</label>
+      <textarea id="meeting-input" style="min-height:200px" placeholder="Paste the summary, action items and transcript here. Markdown works:&#10;# Heading   ## Sub-heading&#10;- [ ] action item   - bullet&#10;**bold**   [link](https://…)"></textarea>
+    </div>
+    <label class="meeting-check"><input type="checkbox" id="meeting-make-tickets"> Also create a board ticket for each action item</label>
+    <div class="modal-actions">
+      <button class="btn ghost" id="meeting-cancel">Cancel</button>
+      <button class="btn primary" id="meeting-create">Create note</button>
+    </div>
+  </div>
+</div>
+
+<script>
+window.__bootKanban = function () {
+  "use strict";
+  var STORE_CARDS = "vytzone.tickets.v2";
+  var STORE_NOTES = "vytzone.notes.v1";
+  var STORE_SEQ   = "vytzone.seq.v1";
+  var STORE_EPICS = "vytzone.epics.v1";
+
+  var EPIC_COLORS = ["#7c3aed", "#2563eb", "#0891b2", "#059669", "#ca8a04", "#ea580c", "#dc2626", "#db2777"];
+  var epics = load(STORE_EPICS, []);
+  function persistEpics() { save(STORE_EPICS, epics); }
+  function findEpic(eid) { for (var i = 0; i < epics.length; i++) { if (epics[i].id === eid) return epics[i]; } return null; }
+
+  // styled confirm dialog (replaces native confirm)
+  var _confirmCb = null;
+  function confirmDelete(message, onConfirm, heading) {
+    _confirmCb = onConfirm;
+    document.getElementById("c-heading").textContent = heading || "Are you sure you want to delete?";
+    document.getElementById("c-msg").textContent = message || "";
+    document.getElementById("confirm-overlay").classList.add("open");
+  }
+
+  var COLUMNS = [
+    { id: "todo",     title: "To Do" },
+    { id: "progress", title: "In Progress" },
+    { id: "blocked",  title: "Blocked" },
+    { id: "done",     title: "Done" }
+  ];
+  var STATUS_TITLE = {};
+  COLUMNS.forEach(function (c) { STATUS_TITLE[c.id] = c.title; });
+
+  function load(key, fallback) {
+    try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }
+    catch (e) { return fallback; }
+  }
+  function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); if (window.cloudSchedulePush) window.cloudSchedulePush(); return true; } catch (e) { return false; } }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function nextSeq() {
+    var n = (load(STORE_SEQ, 0) || 0) + 1;
+    save(STORE_SEQ, n);
+    return "VYT-" + String(n).padStart(3, "0");
+  }
+  function now() { return new Date().toISOString(); }
+  function fmtDate(iso) {
+    if (!iso) return "";
+    var d = new Date(iso.length === 10 ? iso + "T00:00:00" : iso);
+    return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+  function isOverdue(due, status) {
+    if (!due || status === "done") return false;
+    return new Date(due + "T23:59:59") < new Date();
+  }
+  // "overdue" | "soon" (within 3 days) | "" — used for card + chip styling
+  function dueState(due, status) {
+    if (!due || status === "done") return "";
+    var end = new Date(due + "T23:59:59"), nowD = new Date();
+    if (end < nowD) return "overdue";
+    var soon = new Date(); soon.setHours(23, 59, 59, 999); soon.setDate(soon.getDate() + 3);
+    return end <= soon ? "soon" : "";
+  }
+
+  // migrate / seed
+  var cards = load(STORE_CARDS, null);
+  if (!cards) {
+    cards = { todo: [], progress: [], blocked: [], done: [] };
+    cards.todo.push(newTicket({ title: "Click a ticket to edit all its details", priority: "medium", status: "todo" }));
+    cards.todo.push(newTicket({ title: "Drag tickets between columns", priority: "low", status: "todo" }));
+    cards.progress.push(newTicket({ title: "Everything saves automatically", priority: "medium", status: "progress" }));
+    cards.done.push(newTicket({ title: "Set up VYT's Zone", priority: "high", status: "done" }));
+    persist();
+  }
+  COLUMNS.forEach(function (c) { if (!cards[c.id]) cards[c.id] = []; });
+
+  function newTicket(o) {
+    return {
+      id: uid(),
+      ticketId: nextSeq(),
+      title: o.title || "Untitled",
+      desc: o.desc || "",
+      priority: o.priority || "medium",
+      status: o.status || "todo",
+      due: o.due || "",
+      labels: o.labels || [],
+      epic: o.epic || "",
+      attachments: o.attachments || [],
+      links: o.links || [],
+      created: now(),
+      updated: now(),
+      log: o.log || []
+    };
+  }
+  function purgeLinksTo(idToRemove) {
+    Object.keys(cards).forEach(function (k) {
+      (cards[k] || []).forEach(function (c) {
+        if (c.links && c.links.indexOf(idToRemove) !== -1) c.links = c.links.filter(function (x) { return x !== idToRemove; });
+      });
+    });
+  }
+  function persist() {
+    if (!save(STORE_CARDS, cards)) {
+      alert("Couldn't save — your browser storage is full. This usually means attachments are too large. Try removing a large attachment.");
+    }
+  }
+  function findCard(cid) {
+    var found = null;
+    Object.keys(cards).forEach(function (k) {
+      (cards[k] || []).forEach(function (c) { if (c.id === cid) found = c; });
+    });
+    return found;
+  }
+
+  // --- tabs ---
+  function goToView(view) {
+    document.querySelectorAll(".tab").forEach(function (x) { x.classList.toggle("active", x.dataset.view === view); });
+    document.querySelectorAll(".view").forEach(function (x) { x.classList.remove("active"); });
+    document.getElementById(view === "board" ? "board" : "notes-view").classList.add("active");
+  }
+  document.querySelectorAll(".tab").forEach(function (t) {
+    t.addEventListener("click", function () { goToView(t.dataset.view); });
+  });
+
+  // --- global search (tickets + notes) ---
+  (function () {
+    var input = byId("gsearch-input"), box = byId("gsearch-results");
+    var results = [], activeIdx = -1;
+
+    function close() { box.classList.remove("open"); input.setAttribute("aria-expanded", "false"); activeIdx = -1; }
+    function open() { box.classList.add("open"); input.setAttribute("aria-expanded", "true"); }
+
+    function build(q) {
+      results = [];
+      var tHits = allTickets().filter(function (c) {
+        var hay = (c.ticketId + " " + c.title + " " + stripHTML(c.desc) + " " + (c.labels || []).join(" ")).toLowerCase();
+        return hay.indexOf(q) !== -1;
+      }).slice(0, 6).map(function (c) { return { kind: "ticket", c: c }; });
+      var nHits = (notesData || []).filter(function (n) {
+        return ((n.subject || "") + " " + stripHTML(n.body || "")).toLowerCase().indexOf(q) !== -1;
+      }).slice(0, 6).map(function (n) { return { kind: "note", n: n }; });
+      results = tHits.concat(nHits);
+    }
+
+    function paint() {
+      box.innerHTML = "";
+      if (!results.length) { var e = el("div", "gsr-empty"); e.textContent = "No matches"; box.appendChild(e); return; }
+      var lastKind = null;
+      results.forEach(function (r, i) {
+        if (r.kind !== lastKind) {
+          var g = el("div", "gsr-group"); g.textContent = r.kind === "ticket" ? "Tickets" : "Notes"; box.appendChild(g); lastKind = r.kind;
+        }
+        var item = el("div", "gsr-item" + (i === activeIdx ? " active" : "")); item.setAttribute("role", "option");
+        var title = el("div", "gsr-title");
+        if (r.kind === "ticket") {
+          var tag = el("span", "gsr-tag"); tag.textContent = r.c.ticketId; title.appendChild(tag);
+          title.appendChild(document.createTextNode(r.c.title || "Untitled"));
+          item.appendChild(title);
+          var sub = el("div", "gsr-sub");
+          sub.textContent = STATUS_TITLE[r.c.status] + (r.c.due ? " · 📅 " + fmtDate(r.c.due) : "") + (stripHTML(r.c.desc) ? " · " + stripHTML(r.c.desc).replace(/\s+/g, " ").trim() : "");
+          item.appendChild(sub);
+        } else {
+          title.appendChild(document.createTextNode((r.n.subject || "").trim() || "Untitled note"));
+          item.appendChild(title);
+          var p = stripHTML(r.n.body || "").replace(/\s+/g, " ").trim();
+          if (p) { var ns = el("div", "gsr-sub"); ns.textContent = p; item.appendChild(ns); }
+        }
+        item.addEventListener("mousedown", function (ev) { ev.preventDefault(); go(r); });
+        box.appendChild(item);
+      });
+    }
+
+    function go(r) {
+      close(); input.value = "";
+      if (r.kind === "ticket") { goToView("board"); openModal(r.c.id, r.c.status); }
+      else { goToView("notes"); renderNoteList(); openNote(r.n.id); }
+    }
+
+    input.addEventListener("input", function () {
+      var q = input.value.trim().toLowerCase();
+      if (!q) { close(); return; }
+      build(q); activeIdx = -1; paint(); open();
+    });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { close(); input.blur(); return; }
+      if (!box.classList.contains("open") || !results.length) return;
+      if (e.key === "ArrowDown") { e.preventDefault(); activeIdx = (activeIdx + 1) % results.length; paint(); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); activeIdx = (activeIdx - 1 + results.length) % results.length; paint(); }
+      else if (e.key === "Enter") { e.preventDefault(); go(results[activeIdx >= 0 ? activeIdx : 0]); }
+    });
+    input.addEventListener("focus", function () { if (input.value.trim() && results.length) open(); });
+    document.addEventListener("click", function (e) { if (!e.target.closest(".gsearch")) close(); });
+  })();
+
+  // --- filters ---
+  function getFilters() {
+    return {
+      search: byId("flt-search").value.trim().toLowerCase(),
+      priority: byId("flt-priority").value,
+      epic: byId("flt-epic").value,
+      label: byId("flt-label").value
+    };
+  }
+  function filtersActive(f) { return !!(f.search || f.priority || f.epic || f.label); }
+  function cardMatches(c, f) {
+    if (f.priority && c.priority !== f.priority) return false;
+    if (f.epic === "__none__") { if (c.epic) return false; }
+    else if (f.epic && c.epic !== f.epic) return false;
+    if (f.label && (c.labels || []).indexOf(f.label) === -1) return false;
+    if (f.search) {
+      var hay = (c.title + " " + stripHTML(c.desc) + " " + (c.labels || []).join(" ")).toLowerCase();
+      if (hay.indexOf(f.search) === -1) return false;
+    }
+    return true;
+  }
+  function allTickets() {
+    var out = []; COLUMNS.forEach(function (col) { (cards[col.id] || []).forEach(function (c) { out.push(c); }); }); return out;
+  }
+  function populateFilterOptions() {
+    // epics
+    var es = byId("flt-epic"), eVal = es.value;
+    es.innerHTML = '<option value="">All epics</option><option value="__none__">— No epic —</option>';
+    epics.forEach(function (ep) { var o = document.createElement("option"); o.value = ep.id; o.textContent = ep.name; es.appendChild(o); });
+    es.value = eVal;
+    // labels from existing tickets
+    var labels = {};
+    allTickets().forEach(function (c) {
+      (c.labels || []).forEach(function (l) { if (l) labels[l] = 1; });
+    });
+    fillSelect(byId("flt-label"), "All labels", Object.keys(labels).sort());
+  }
+  function fillSelect(sel, allLabel, values) {
+    var cur = sel.value;
+    sel.innerHTML = '<option value="">' + allLabel + '</option>';
+    values.forEach(function (v) { var o = document.createElement("option"); o.value = v; o.textContent = v; sel.appendChild(o); });
+    if (values.indexOf(cur) !== -1) sel.value = cur; else sel.value = "";
+  }
+
+  // --- render ---
+  var board = document.getElementById("kanban");
+  var filterOn = false;
+  function render() {
+    populateFilterOptions();
+    var f = getFilters();
+    var active = filtersActive(f);
+    filterOn = active; // set before building cards so draggable reflects current state
+    document.querySelector(".filter-bar").classList.toggle("active", active);
+    var totalAll = 0, totalShown = 0;
+
+    board.innerHTML = "";
+    COLUMNS.forEach(function (col) {
+      var list = cards[col.id] || (cards[col.id] = []);
+      var shown = list.filter(function (c) { return cardMatches(c, f); });
+      totalAll += list.length; totalShown += shown.length;
+      var column = el("div", "column"); column.dataset.col = col.id;
+
+      var head = el("div", "col-head");
+      head.appendChild(el("span", "dot"));
+      head.appendChild(document.createTextNode(col.title));
+      var count = el("span", "count"); count.textContent = active ? (shown.length + "/" + list.length) : list.length; head.appendChild(count);
+      var colAdd = el("button", "col-add"); colAdd.textContent = "+"; colAdd.title = "Add a ticket";
+      colAdd.addEventListener("click", function () { openModal(null, col.id); });
+      head.appendChild(colAdd);
+      column.appendChild(head);
+
+      var cardsEl = el("div", "cards"); cardsEl.dataset.col = col.id;
+      if (!shown.length) {
+        var emp = el("div", "empty-col"); emp.textContent = active ? "No matching tickets" : "No tickets yet";
+        cardsEl.appendChild(emp);
+      } else {
+        shown.forEach(function (c) { cardsEl.appendChild(makeCard(c, col.id)); });
+      }
+      column.appendChild(cardsEl);
+
+      cardsEl.addEventListener("dragover", function (e) {
+        e.preventDefault(); cardsEl.classList.add("drop-hint");
+        // auto-scroll the column when dragging near its top/bottom edge
+        var rect = cardsEl.getBoundingClientRect(), edge = 44;
+        if (e.clientY < rect.top + edge) cardsEl.scrollTop -= 14;
+        else if (e.clientY > rect.bottom - edge) cardsEl.scrollTop += 14;
+        var after = getDragAfter(cardsEl, e.clientY);
+        var dragging = document.querySelector(".dragging");
+        if (!dragging) return;
+        if (after == null) cardsEl.appendChild(dragging); else cardsEl.insertBefore(dragging, after);
+      });
+      cardsEl.addEventListener("dragleave", function () { cardsEl.classList.remove("drop-hint"); });
+      cardsEl.addEventListener("drop", function (e) { e.preventDefault(); cardsEl.classList.remove("drop-hint"); syncFromDom(); });
+
+      board.appendChild(column);
+    });
+    byId("flt-count").textContent = active ? ("Showing " + totalShown + " of " + totalAll + " tickets") : "";
+    renderEpics(); // keep epic completion % in sync with ticket changes
+  }
+
+  function makeCard(c, colId) {
+    var ds = dueState(c.due, colId);
+    var card = el("div", "card" + (ds === "overdue" ? " due-overdue" : ds === "soon" ? " due-soon" : ""));
+    card.draggable = !filterOn; card.dataset.id = c.id;
+
+    var idEl = el("div", "id"); idEl.textContent = c.ticketId; card.appendChild(idEl);
+    var title = el("div", "title"); title.textContent = c.title; card.appendChild(title);
+
+    var meta = el("div", "meta");
+    var pr = el("span", "badge " + c.priority); pr.textContent = cap(c.priority); meta.appendChild(pr);
+    if (c.due) {
+      var due = el("span", "chip due" + (ds === "overdue" ? " overdue" : ds === "soon" ? " duesoon" : ""));
+      due.textContent = (ds === "overdue" ? "⚠️ " : ds === "soon" ? "⏳ " : "📅 ") + fmtDate(c.due);
+      if (ds === "overdue") due.title = "Overdue"; else if (ds === "soon") due.title = "Due soon";
+      meta.appendChild(due);
+    }
+    if (c.epic) {
+      var ep = el("span", "chip epic");
+      var epicObj = findEpic(c.epic);
+      if (epicObj) { ep.textContent = "🏷 " + epicObj.name; ep.style.background = epicObj.color; ep.style.color = "#fff"; ep.style.borderColor = epicObj.color; }
+      else { ep.textContent = "🏷 " + c.epic; } // legacy free-text fallback
+      meta.appendChild(ep);
+    }
+    (c.labels || []).forEach(function (l) { if (l) { var lb = el("span", "chip label"); lb.textContent = l; meta.appendChild(lb); } });
+    if (c.attachments && c.attachments.length) { var at = el("span", "chip attach"); at.textContent = "📎 " + c.attachments.length; meta.appendChild(at); }
+    if (c.links && c.links.length) { var lk = el("span", "chip links"); lk.textContent = "🔗 " + c.links.length; meta.appendChild(lk); }
+    card.appendChild(meta);
+
+    var del = el("button", "del"); del.innerHTML = "&times;"; del.title = "Delete";
+    del.addEventListener("click", function (e) {
+      e.stopPropagation();
+      confirmDelete("Ticket " + c.ticketId + ' "' + c.title + '" will be permanently deleted. This cannot be undone.', function () {
+        cards[colId] = cards[colId].filter(function (x) { return x.id !== c.id; });
+        purgeLinksTo(c.id);
+        persist(); render();
+      });
+    });
+    card.appendChild(del);
+
+    card.addEventListener("click", function (e) { if (e.target === del) return; openModal(c.id, colId); });
+    card.addEventListener("dragstart", function (e) { if (e.target.tagName === "INPUT") return; card.classList.add("dragging"); });
+    card.addEventListener("dragend", function () { card.classList.remove("dragging"); syncFromDom(); });
+    return card;
+  }
+
+  function getDragAfter(container, y) {
+    var els = [].slice.call(container.querySelectorAll(".card:not(.dragging)"));
+    var closest = { offset: -Infinity, el: null };
+    els.forEach(function (child) {
+      var box = child.getBoundingClientRect();
+      var offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) closest = { offset: offset, el: child };
+    });
+    return closest.el;
+  }
+
+  function syncFromDom() {
+    var next = {};
+    COLUMNS.forEach(function (col) {
+      next[col.id] = [];
+      var container = board.querySelector('.cards[data-col="' + col.id + '"]');
+      if (!container) return;
+      [].slice.call(container.querySelectorAll(".card")).forEach(function (cardEl) {
+        var c = findCard(cardEl.dataset.id);
+        if (c) {
+          if (c.status !== col.id) { c.status = col.id; c.updated = now(); addLog(c, "moved to " + STATUS_TITLE[col.id]); }
+          next[col.id].push(c);
+        }
+      });
+    });
+    cards = next; persist(); render();
+  }
+
+  // --- modal ---
+  var overlay = document.getElementById("overlay");
+  var editingId = null, editingCol = null, draftAttachments = [], draftLinks = [];
+  var CLOUDINARY_CLOUD = "dam1d4r3h";
+  var CLOUDINARY_PRESET = "kanban";
+  var F = {
+    title: byId("f-title"), desc: byId("f-desc"), priority: byId("f-priority"),
+    status: byId("f-status"), due: byId("f-due"),
+    labels: byId("f-labels"), epic: byId("f-epic"), comment: byId("f-comment")
+  };
+
+  function openModal(cid, colId) {
+    editingId = cid; editingCol = colId;
+    var c = cid ? findCard(cid) : null;
+    byId("m-heading").textContent = c ? "Edit ticket" : "New ticket";
+    byId("m-id").textContent = c ? c.ticketId : "Start typing a title to create this ticket";
+    F.title.value = c ? c.title : "";
+    F.desc.innerHTML = (c && c.desc) ? toEditorHTML(c.desc) : "";
+    F.priority.value = c ? c.priority : "medium";
+    F.status.value = c ? c.status : (colId || "todo");
+    F.due.value = c ? c.due : "";
+    F.labels.value = c ? (c.labels || []).join(", ") : "";
+    populateEpicSelect(c ? c.epic : "");
+    F.comment.innerHTML = (c && c.commentDraft) ? sanitizeCommentHTML(c.commentDraft) : "";
+    showDraftStatus(c && c.commentDraft ? "Draft restored" : "");
+    draftAttachments = (c && c.attachments) ? c.attachments.slice() : [];
+    byId("f-link-url").value = "";
+    byId("f-file-input").value = "";
+    renderAttachList();
+    draftLinks = (c && c.links) ? c.links.slice() : [];
+    byId("f-linksearch").value = "";
+    renderLinkedList();
+
+    // All fields are always shown; only Title is required.
+    byId("m-extra-fields").style.display = "block";
+    byId("m-delete").style.display = c ? "inline-block" : "none";
+    byId("m-comment-section").style.display = c ? "block" : "none";
+    byId("m-activity").style.display = c ? "block" : "none";
+    byId("m-activity").classList.add("collapsed"); // start collapsed each time
+    byId("m-timestamps").textContent = c ? ("Created " + fmtDateTime(c.created) + " · Updated " + fmtDateTime(c.updated)) : "";
+    if (c) renderLog(c);
+    clearTitleError();
+
+    overlay.classList.add("open");
+    closeLinkPop();
+    lastSel = null; updateToolbarState();
+    F.title.focus();
+  }
+  function closeModal() { flushCommentDraft(); overlay.classList.remove("open"); editingId = null; editingCol = null; clearTitleError(); }
+
+  // --- rich description field (plain text + ⌘K links) ---
+  // Old descriptions were plain text; convert them so line breaks survive.
+  function toEditorHTML(s) {
+    if (/<[a-z][\s\S]*>/i.test(s)) return s;          // already HTML (new tickets)
+    return esc(s).replace(/\n/g, "<br>");             // legacy plain text
+  }
+  // Read the editor's content for saving; collapse a visually-empty field to "".
+  function getDesc() {
+    if (F.desc.textContent.trim() === "" && !F.desc.querySelector("a,img")) return "";
+    return F.desc.innerHTML.trim();
+  }
+  function stripHTML(s) { var d = document.createElement("div"); d.innerHTML = s || ""; return d.textContent || ""; }
+  // keep the :empty placeholder working when the browser leaves a stray <br>,
+  // but never wipe a structural block the user is about to type into
+  F.desc.addEventListener("input", function () {
+    if (this.textContent.trim() === "" && !this.querySelector("a,img,ul,ol,blockquote,h1,h2,h3,code,pre")) this.innerHTML = "";
+  });
+  // click a link to open it in a new tab (edit/remove a link with ⌘K)
+  F.desc.addEventListener("click", function (e) {
+    var a = e.target.closest ? e.target.closest("a") : null;
+    if (a && a.href) { window.open(a.href, "_blank", "noopener,noreferrer"); e.preventDefault(); }
+  });
+  // ⌘K / Ctrl+K opens the link popover
+  F.desc.addEventListener("keydown", function (e) {
+    if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) { e.preventDefault(); openLinkPop(F.desc); }
+  });
+
+  var linkPop = byId("link-pop"), savedRange = null, linkPopContext = null;
+  function anchorAtSelection(ctx) {
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+    var n = sel.anchorNode;
+    while (n && n !== ctx) { if (n.nodeName === "A") return n; n = n.parentNode; }
+    return null;
+  }
+  function openLinkPop(ctx) {
+    linkPopContext = ctx || F.desc;
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    savedRange = sel.getRangeAt(0).cloneRange();
+    var a = anchorAtSelection(linkPopContext);
+    byId("lp-url").value = a ? (a.getAttribute("href") || "") : "";
+    byId("lp-remove").style.display = a ? "inline-block" : "none";
+    var r;
+    try { r = savedRange.getBoundingClientRect(); } catch (err) { r = null; }
+    if (!r || (!r.width && !r.height && !r.top)) r = linkPopContext.getBoundingClientRect();
+    linkPop.style.display = "block";
+    var w = linkPop.offsetWidth || 290, h = linkPop.offsetHeight || 90;
+    linkPop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + "px";
+    linkPop.style.top = Math.max(8, Math.min((r.bottom || r.top) + 6, window.innerHeight - h - 8)) + "px";
+    byId("lp-url").focus(); byId("lp-url").select();
+  }
+  function closeLinkPop() { linkPop.style.display = "none"; savedRange = null; linkPopContext = null; }
+  function restoreRange() {
+    if (!savedRange || !linkPopContext) return;
+    linkPopContext.focus();
+    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(savedRange);
+  }
+  function normalizeLinks() {
+    [].slice.call((linkPopContext || F.desc).querySelectorAll("a")).forEach(function (x) {
+      x.target = "_blank"; x.rel = "noopener noreferrer";
+      x.title = x.getAttribute("href") + "  (click to open)";
+    });
+  }
+  function applyLink() {
+    var url = byId("lp-url").value.trim();
+    if (!url) return;
+    if (!/^(https?:|mailto:)/i.test(url)) url = "https://" + url;
+    restoreRange();
+    var a = anchorAtSelection(linkPopContext);
+    if (a) {
+      a.setAttribute("href", url);
+    } else if (savedRange && savedRange.collapsed) {
+      var node = document.createElement("a"); node.href = url; node.textContent = url;
+      savedRange.insertNode(node);
+      savedRange.setStartAfter(node); savedRange.collapse(true);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(savedRange);
+    } else {
+      document.execCommand("createLink", false, url);
+    }
+    normalizeLinks();
+    var isNote = linkPopContext === byId("note-body");
+    closeLinkPop();
+    if (isNote) saveActiveNoteDebounced(); else saveNow();
+  }
+  function removeLink() {
+    restoreRange();
+    var a = anchorAtSelection(linkPopContext);
+    if (a) { var p = a.parentNode; while (a.firstChild) p.insertBefore(a.firstChild, a); p.removeChild(a); }
+    else { document.execCommand("unlink"); }
+    var isNote = linkPopContext === byId("note-body");
+    closeLinkPop();
+    if (isNote) saveActiveNoteDebounced(); else saveNow();
+  }
+  byId("lp-apply").addEventListener("click", applyLink);
+  byId("lp-remove").addEventListener("click", removeLink);
+  byId("lp-url").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); applyLink(); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); F.desc.focus(); closeLinkPop(); }
+  });
+  document.addEventListener("mousedown", function (e) {
+    if (linkPop.style.display === "block" && !linkPop.contains(e.target) && e.target !== F.desc && !F.desc.contains(e.target)) closeLinkPop();
+  });
+
+  // --- formatting toolbar ---
+  var toolbar = byId("f-desc-toolbar");
+  try { document.execCommand("styleWithCSS", false, false); } catch (e) {}
+  function parentTag(node, tag) {
+    while (node && node !== F.desc) { if (node.nodeName === tag) return node; node = node.parentNode; }
+    return null;
+  }
+  function toggleInlineCode() {
+    var sel = window.getSelection(); if (!sel.rangeCount) return;
+    var codeEl = parentTag(sel.anchorNode, "CODE");
+    if (codeEl) { var p = codeEl.parentNode; while (codeEl.firstChild) p.insertBefore(codeEl.firstChild, codeEl); p.removeChild(codeEl); return; }
+    var range = sel.getRangeAt(0); if (range.collapsed) return;
+    var code = document.createElement("code");
+    try { range.surroundContents(code); }
+    catch (err) { code.appendChild(range.extractContents()); range.insertNode(code); }
+  }
+  function applyCommand(cmd) {
+    F.desc.focus(); restoreSel();
+    if (cmd === "link") { openLinkPop(F.desc); return; }
+    if (cmd === "quote") {
+      var inQuote = parentTag(window.getSelection().anchorNode, "BLOCKQUOTE");
+      document.execCommand("formatBlock", false, inQuote ? "p" : "blockquote");
+    } else if (cmd === "code") { toggleInlineCode(); }
+    else { document.execCommand(cmd, false, null); }
+    normalizeLinks(); updateToolbarState(); saveNow();
+  }
+  // keep the editor's selection alive while interacting with the toolbar
+  toolbar.addEventListener("mousedown", function (e) { if (e.target.closest(".rt-btn")) e.preventDefault(); });
+  toolbar.addEventListener("click", function (e) {
+    var btn = e.target.closest(".rt-btn"); if (!btn) return;
+    applyCommand(btn.dataset.cmd);
+  });
+  byId("rt-block").addEventListener("change", function () {
+    var v = this.value; F.desc.focus(); restoreSel();
+    document.execCommand("formatBlock", false, v);
+    updateToolbarState(); saveNow();
+  });
+
+  // track the live selection so dropdown/button focus changes don't lose it
+  var lastSel = null;
+  function saveSel() {
+    var sel = window.getSelection();
+    if (sel && sel.rangeCount && F.desc.contains(sel.anchorNode)) lastSel = sel.getRangeAt(0).cloneRange();
+  }
+  function restoreSel() {
+    if (!lastSel) return;
+    var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(lastSel);
+  }
+  document.addEventListener("selectionchange", function () { saveSel(); if (F.desc.contains(window.getSelection().anchorNode)) updateToolbarState(); });
+
+  var STATE_CMDS = ["bold", "italic", "strikeThrough", "insertUnorderedList", "insertOrderedList"];
+  function updateToolbarState() {
+    if (!overlay.classList.contains("open")) return;
+    var anchor = window.getSelection().anchorNode;
+    [].slice.call(toolbar.querySelectorAll(".rt-btn")).forEach(function (b) {
+      var cmd = b.dataset.cmd, on = false;
+      if (STATE_CMDS.indexOf(cmd) !== -1) { try { on = document.queryCommandState(cmd); } catch (e) {} }
+      else if (cmd === "code") on = !!parentTag(anchor, "CODE");
+      else if (cmd === "quote") on = !!parentTag(anchor, "BLOCKQUOTE");
+      b.classList.toggle("active", on);
+    });
+    var h = "p";
+    ["H1", "H2", "H3"].forEach(function (t) { if (parentTag(anchor, t)) h = t.toLowerCase(); });
+    byId("rt-block").value = h;
+  }
+  F.desc.addEventListener("keyup", updateToolbarState);
+  F.desc.addEventListener("mouseup", updateToolbarState);
+
+  // collapsible History section
+  byId("m-activity-toggle").addEventListener("click", function () {
+    byId("m-activity").classList.toggle("collapsed");
+  });
+
+  function showTitleError() { byId("f-title-error").classList.add("show"); F.title.classList.add("invalid"); F.title.focus(); }
+  function clearTitleError() { byId("f-title-error").classList.remove("show"); F.title.classList.remove("invalid"); }
+  F_titleClearOnType();
+  function F_titleClearOnType() { byId("f-title").addEventListener("input", clearTitleError); }
+
+  function renderLog(c) {
+    var ul = byId("m-log"); ul.innerHTML = "";
+    if (!c.log || !c.log.length) { var li = document.createElement("li"); li.textContent = "No activity yet."; ul.appendChild(li); return; }
+    c.log.slice().reverse().forEach(function (entry) {
+      var li = document.createElement("li");
+      if (entry.html) {
+        li.innerHTML = '<span class="who">' + esc(entry.text || "💬") + '</span> <span class="comment-body">' + sanitizeCommentHTML(entry.html) + '</span> · ' + fmtDateTime(entry.at);
+      } else {
+        li.innerHTML = '<span class="who">' + esc(entry.text) + '</span> · ' + fmtDateTime(entry.at);
+      }
+      ul.appendChild(li);
+    });
+  }
+  function addLog(c, text) { (c.log = c.log || []).push({ text: text, at: now() }); }
+
+  function parseLabels(s) { return s.split(",").map(function (x) { return x.trim(); }).filter(Boolean); }
+
+  // --- attachments ---
+  function renderAttachList() {
+    var ul = byId("f-attach-list"); ul.innerHTML = "";
+    draftAttachments.forEach(function (a) {
+      var li = el("li", "attach-item");
+      if (a.kind === "link") {
+        var ic = el("span", "ic"); ic.textContent = "🔗"; li.appendChild(ic);
+        var nm = el("span", "a-name");
+        var link = document.createElement("a");
+        link.href = a.url; link.target = "_blank"; link.rel = "noopener noreferrer"; link.textContent = a.name || a.url;
+        nm.appendChild(link); li.appendChild(nm);
+      } else if (a.uploading) {
+        var ic0 = el("span", "ic"); ic0.textContent = "⏳"; li.appendChild(ic0);
+        var nm0 = el("span", "a-name"); nm0.textContent = a.name + " — uploading…"; li.appendChild(nm0);
+      } else if (a.mime && a.mime.indexOf("image/") === 0) {
+        var fileUrl = a.url || a.data;
+        var img = document.createElement("img"); img.className = "thumb"; img.src = fileUrl; img.alt = a.name; li.appendChild(img);
+        var nmi = el("span", "a-name");
+        var al = document.createElement("a"); al.href = fileUrl; al.target = "_blank"; al.rel = "noopener noreferrer"; al.textContent = a.name; nmi.appendChild(al);
+        li.appendChild(nmi);
+        var sz = el("span", "a-size"); sz.textContent = fmtBytes(a.size); li.appendChild(sz);
+      } else {
+        var fileUrl2 = a.url || a.data;
+        var ic2 = el("span", "ic"); ic2.textContent = "📄"; li.appendChild(ic2);
+        var nm2 = el("span", "a-name");
+        var al2 = document.createElement("a"); al2.href = fileUrl2; al2.target = "_blank"; al2.rel = "noopener noreferrer"; al2.textContent = a.name; nm2.appendChild(al2);
+        li.appendChild(nm2);
+        var sz2 = el("span", "a-size"); sz2.textContent = fmtBytes(a.size); li.appendChild(sz2);
+      }
+      var del = el("button", "a-del"); del.innerHTML = "&times;"; del.title = "Remove";
+      del.addEventListener("click", function () {
+        draftAttachments = draftAttachments.filter(function (x) { return x.id !== a.id; });
+        renderAttachList(); saveNow();
+      });
+      li.appendChild(del);
+      ul.appendChild(li);
+    });
+  }
+  function fmtBytes(b) {
+    if (!b && b !== 0) return "";
+    if (b < 1024) return b + " B";
+    if (b < 1024 * 1024) return (b / 1024).toFixed(0) + " KB";
+    return (b / 1024 / 1024).toFixed(1) + " MB";
+  }
+  function addFiles(fileList) {
+    [].slice.call(fileList).forEach(function (file) {
+      var attachId = uid();
+      var placeholder = { id: attachId, kind: "file", name: file.name, mime: file.type, size: file.size, uploading: true };
+      draftAttachments.push(placeholder);
+      renderAttachList();
+
+      var fd = new FormData();
+      fd.append("file", file);
+      fd.append("upload_preset", CLOUDINARY_PRESET);
+
+      var xhr = new XMLHttpRequest();
+      xhr.open("POST", "https://api.cloudinary.com/v1_1/" + CLOUDINARY_CLOUD + "/auto/upload");
+      xhr.onload = function () {
+        var idx = -1;
+        for (var i = 0; i < draftAttachments.length; i++) { if (draftAttachments[i].id === attachId) { idx = i; break; } }
+        if (xhr.status === 200) {
+          var res = JSON.parse(xhr.responseText);
+          if (idx !== -1) draftAttachments[idx] = { id: attachId, kind: "file", name: file.name, mime: file.type, size: file.size, url: res.secure_url };
+        } else {
+          if (idx !== -1) draftAttachments.splice(idx, 1);
+          alert("Upload failed for “" + file.name + "”. Please try again.");
+        }
+        renderAttachList(); saveNow();
+      };
+      xhr.onerror = function () {
+        var idx = -1;
+        for (var i = 0; i < draftAttachments.length; i++) { if (draftAttachments[i].id === attachId) { idx = i; break; } }
+        if (idx !== -1) draftAttachments.splice(idx, 1);
+        alert("Upload error for “" + file.name + "”. Check your internet connection.");
+        renderAttachList();
+      };
+      xhr.send(fd);
+    });
+  }
+  function addLink() {
+    var url = byId("f-link-url").value.trim();
+    if (!url) return;
+    if (!/^https?:\/\//i.test(url)) url = "https://" + url;
+    draftAttachments.push({ id: uid(), kind: "link", name: url, url: url });
+    byId("f-link-url").value = "";
+    renderAttachList(); saveNow();
+  }
+
+  byId("f-attach-btn").addEventListener("click", function () { byId("f-file-input").click(); });
+  byId("f-file-input").addEventListener("change", function (e) { addFiles(e.target.files); e.target.value = ""; });
+  byId("f-link-btn").addEventListener("click", addLink);
+  byId("f-link-url").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); addLink(); } });
+  var dz = byId("f-dropzone");
+  ["dragenter", "dragover"].forEach(function (ev) {
+    dz.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); dz.classList.add("dragover"); });
+  });
+  ["dragleave", "drop"].forEach(function (ev) {
+    dz.addEventListener(ev, function (e) { e.preventDefault(); e.stopPropagation(); dz.classList.remove("dragover"); });
+  });
+  dz.addEventListener("drop", function (e) { if (e.dataTransfer && e.dataTransfer.files) addFiles(e.dataTransfer.files); });
+
+  // --- linked tickets ---
+  function populateLinkSelect() {
+    var sel = byId("f-linksel");
+    var q = byId("f-linksearch").value.trim().toLowerCase();
+    sel.innerHTML = "";
+    var matches = allTickets().filter(function (t) {
+      if (editingId && t.id === editingId) return false;       // not itself
+      if (draftLinks.indexOf(t.id) !== -1) return false;        // not already linked
+      if (!q) return true;
+      return (t.ticketId + " " + t.title).toLowerCase().indexOf(q) !== -1;
+    });
+    var ph = document.createElement("option");
+    ph.value = ""; ph.textContent = matches.length ? "Select a ticket to link…" : "No matching tickets";
+    sel.appendChild(ph);
+    matches.forEach(function (t) {
+      var o = document.createElement("option");
+      o.value = t.id; o.textContent = t.ticketId + " — " + t.title;
+      sel.appendChild(o);
+    });
+    // if searching narrows to a single result, preselect it so Link works in one click
+    if (q && matches.length === 1) sel.value = matches[0].id;
+  }
+  function renderLinkedList() {
+    populateLinkSelect();
+    var ul = byId("f-linked-list"); ul.innerHTML = "";
+    draftLinks.forEach(function (lid) {
+      var t = findCard(lid); if (!t) return;
+      var li = el("li", "linked-item");
+      var idEl = el("span", "l-id"); idEl.textContent = t.ticketId; li.appendChild(idEl);
+      var title = el("span", "l-title"); title.textContent = t.title;
+      title.addEventListener("click", function () { closeModal(); openModal(t.id, t.status); });
+      li.appendChild(title);
+      var tag = el("span", "status-tag " + t.status); tag.textContent = STATUS_TITLE[t.status]; li.appendChild(tag);
+      var del = el("button", "l-del"); del.innerHTML = "&times;"; del.title = "Unlink";
+      del.addEventListener("click", function () {
+        draftLinks = draftLinks.filter(function (x) { return x !== lid; });
+        renderLinkedList(); saveNow();
+      });
+      li.appendChild(del);
+      ul.appendChild(li);
+    });
+  }
+  byId("f-link-add").addEventListener("click", function () {
+    var v = byId("f-linksel").value;
+    if (v && draftLinks.indexOf(v) === -1) { draftLinks.push(v); byId("f-linksearch").value = ""; renderLinkedList(); saveNow(); }
+  });
+  byId("f-linksearch").addEventListener("input", populateLinkSelect);
+  byId("f-linksearch").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { e.preventDefault(); byId("f-link-add").click(); }
+  });
+
+  // keep both sides of a link in sync after a ticket is saved
+  function reconcileLinks(selfId, before, after) {
+    before.forEach(function (oid) {
+      if (after.indexOf(oid) === -1) {
+        var o = findCard(oid); if (o && o.links) o.links = o.links.filter(function (x) { return x !== selfId; });
+      }
+    });
+    after.forEach(function (oid) {
+      var o = findCard(oid); if (o) { o.links = o.links || []; if (o.links.indexOf(selfId) === -1) o.links.push(selfId); }
+    });
+  }
+
+  // --- auto-save (no Save button) ---
+  // Persists the open ticket whenever a field changes. A brand-new ticket is
+  // created the moment a title is typed; from then on every edit is saved live.
+  var saveTimer = null;
+  function flashSaved() {
+    var s = byId("m-saved"); if (!s) return;
+    s.classList.add("show");
+    clearTimeout(s._t); s._t = setTimeout(function () { s.classList.remove("show"); }, 1100);
+  }
+  function commitCard() {
+    if (!overlay.classList.contains("open")) return;
+    var title = F.title.value.trim();
+    var c = editingId ? findCard(editingId) : null;
+    if (!title) { if (c) showTitleError(); return; } // never wipe a saved title; nothing to create yet
+    clearTitleError();
+    var newStatus = F.status.value;
+
+    if (c) {
+      c.title = title; c.desc = getDesc(); c.priority = F.priority.value;
+      c.due = F.due.value;
+      c.labels = parseLabels(F.labels.value); c.epic = F.epic.value.trim();
+      c.attachments = draftAttachments.slice();
+      var prevLinks = (c.links || []).slice();
+      c.links = draftLinks.slice();
+      reconcileLinks(c.id, prevLinks, c.links);
+      if (c.status !== newStatus) {
+        cards[c.status] = cards[c.status].filter(function (x) { return x.id !== c.id; });
+        c.status = newStatus; addLog(c, "moved to " + STATUS_TITLE[newStatus]);
+        cards[newStatus].push(c); editingCol = newStatus;
+      }
+      c.updated = now();
+    } else {
+      c = newTicket({
+        title: title, desc: getDesc(), priority: F.priority.value, status: newStatus,
+        due: F.due.value, labels: parseLabels(F.labels.value), epic: F.epic.value.trim(),
+        attachments: draftAttachments.slice(), links: draftLinks.slice()
+      });
+      addLog(c, "created");
+      cards[newStatus].push(c);
+      reconcileLinks(c.id, [], c.links);
+      editingId = c.id; editingCol = newStatus;
+      // promote the modal from "new" to "edit" mode
+      byId("m-heading").textContent = "Edit ticket";
+      byId("m-id").textContent = c.ticketId;
+      byId("m-delete").style.display = "inline-block";
+      byId("m-comment-section").style.display = "block";
+      byId("m-activity").style.display = "block";
+    }
+    byId("m-timestamps").textContent = "Created " + fmtDateTime(c.created) + " · Updated " + fmtDateTime(c.updated);
+    renderLog(c);
+    persist(); render(); flashSaved();
+  }
+  // expose so attachment/link handlers can trigger a save
+  function saveNow() { commitCard(); }
+  function saveDebounced() { clearTimeout(saveTimer); saveTimer = setTimeout(commitCard, 400); }
+
+  // text inputs save shortly after you stop typing; selects/date save instantly
+  [F.title, F.desc, F.labels].forEach(function (input) { input.addEventListener("input", saveDebounced); });
+  [F.priority, F.status, F.due].forEach(function (input) { input.addEventListener("change", saveNow); });
+
+  byId("m-comment-btn").addEventListener("click", function () {
+    var c = editingId ? findCard(editingId) : null; if (!c) return;
+    var html = sanitizeCommentHTML(F.comment.innerHTML);
+    if (!stripHTML(html).trim() && html.indexOf("<a ") === -1) return;
+    (c.log = c.log || []).push({ text: "💬", html: html, at: now() });
+    c.updated = now(); F.comment.innerHTML = "";
+    clearTimeout(draftTimer); draftTimer = null; delete c.commentDraft; showDraftStatus("");
+    persist(); renderLog(c);
+    byId("m-timestamps").textContent = "Created " + fmtDateTime(c.created) + " · Updated " + fmtDateTime(c.updated);
+  });
+  // Toolbar formatting buttons (bold, italic, lists, links…)
+  byId("f-comment-toolbar").addEventListener("mousedown", function (e) {
+    var b = e.target.closest(".ct-btn"); if (!b) return;
+    e.preventDefault();               // keep focus/selection in the editor
+    F.comment.focus();
+    var cmd = b.getAttribute("data-cmd");
+    if (cmd === "createLink") {
+      var url = prompt("Link URL:", "https://");
+      if (url) { try { new URL(url); } catch (err) { url = "https://" + url.replace(/^https?:\/\//, ""); } document.execCommand("createLink", false, url); }
+    } else {
+      document.execCommand(cmd, false, null);
+    }
+    updateToolbarState();
+  });
+  ["keyup", "mouseup", "input", "focus"].forEach(function (ev) {
+    F.comment.addEventListener(ev, updateToolbarState);
+  });
+  // Ctrl/Cmd+Enter posts the comment (plain Enter makes a new line)
+  F.comment.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); byId("m-comment-btn").click(); }
+  });
+
+  // --- auto-saving comment drafts (per ticket) ---
+  var draftTimer = null, draftStatusTimer = null;
+  function showDraftStatus(msg) {
+    var s = byId("f-comment-draft");
+    s.textContent = msg || "";
+    s.classList.toggle("show", !!msg);
+    clearTimeout(draftStatusTimer);
+    if (msg === "Draft saved") draftStatusTimer = setTimeout(function () { s.classList.remove("show"); }, 1800);
+  }
+  function saveCommentDraft() {
+    draftTimer = null;
+    var c = editingId ? findCard(editingId) : null; if (!c) return;
+    var html = sanitizeCommentHTML(F.comment.innerHTML);
+    var hasContent = !!(stripHTML(html).trim() || html.indexOf("<a ") !== -1);
+    if (hasContent) c.commentDraft = html; else delete c.commentDraft;
+    persist();
+    showDraftStatus(hasContent ? "Draft saved" : "");
+  }
+  function flushCommentDraft() { if (draftTimer) { clearTimeout(draftTimer); saveCommentDraft(); } }
+  F.comment.addEventListener("input", function () {
+    if (!editingId) return;
+    clearTimeout(draftTimer);
+    showDraftStatus("Saving…");
+    draftTimer = setTimeout(saveCommentDraft, 600);
+  });
+  function updateToolbarState() {
+    ["bold", "italic", "underline", "insertUnorderedList", "insertOrderedList"].forEach(function (cmd) {
+      var btn = document.querySelector('#f-comment-toolbar .ct-btn[data-cmd="' + cmd + '"]');
+      if (!btn) return;
+      var on = false; try { on = document.queryCommandState(cmd); } catch (err) {}
+      btn.classList.toggle("active", on);
+    });
+  }
+  // Keep only safe formatting tags so stored comments render predictably
+  function sanitizeCommentHTML(html) {
+    var allowed = { B: 1, STRONG: 1, I: 1, EM: 1, U: 1, A: 1, UL: 1, OL: 1, LI: 1, BR: 1, P: 1, DIV: 1, SPAN: 1 };
+    var wrap = document.createElement("div"); wrap.innerHTML = html;
+    (function clean(node) {
+      var kids = Array.prototype.slice.call(node.childNodes);
+      kids.forEach(function (n) {
+        if (n.nodeType === 1) {
+          if (!allowed[n.tagName]) {
+            while (n.firstChild) node.insertBefore(n.firstChild, n);
+            node.removeChild(n); return;
+          }
+          Array.prototype.slice.call(n.attributes).forEach(function (a) {
+            if (n.tagName === "A" && a.name === "href") {
+              if (!/^https?:|^mailto:/i.test(a.value)) n.removeAttribute("href");
+            } else { n.removeAttribute(a.name); }
+          });
+          if (n.tagName === "A") { n.setAttribute("target", "_blank"); n.setAttribute("rel", "noopener noreferrer"); }
+          clean(n);
+        } else if (n.nodeType !== 3) { node.removeChild(n); }
+      });
+    })(wrap);
+    return wrap.innerHTML;
+  }
+
+  byId("m-delete").addEventListener("click", function () {
+    if (!editingId) return;
+    var c = findCard(editingId); if (!c) return;
+    confirmDelete("Ticket " + c.ticketId + ' "' + c.title + '" will be permanently deleted. This cannot be undone.', function () {
+      cards[c.status] = cards[c.status].filter(function (x) { return x.id !== c.id; });
+      purgeLinksTo(c.id);
+      persist(); render(); closeModal();
+    });
+  });
+  // Close only when the mouse is both pressed AND released on the backdrop.
+  // This stops a text-selection drag that ends outside the box from closing the modal.
+  function backdropClose(overlayEl, closeFn) {
+    var downOnSelf = false;
+    overlayEl.addEventListener("mousedown", function (e) { downOnSelf = (e.target === overlayEl); });
+    overlayEl.addEventListener("click", function (e) { if (e.target === overlayEl && downOnSelf) closeFn(); downOnSelf = false; });
+  }
+
+  byId("m-cancel").addEventListener("click", closeModal);
+  backdropClose(overlay, closeModal);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && overlay.classList.contains("open")) closeModal(); });
+
+  // --- epics ---
+  function renderEpics() {
+    var listEl = byId("epics-list"), countEl = byId("epics-count"), filterEl = byId("epic-filter");
+    var q = (filterEl ? filterEl.value.trim().toLowerCase() : "");
+    // only surface the filter + count + scroll once the list gets long
+    var many = epics.length > 8;
+    if (filterEl) filterEl.style.display = many ? "" : "none";
+    if (countEl) countEl.style.display = many ? "" : "none";
+    listEl.classList.toggle("scroll", many);
+    listEl.innerHTML = "";
+    if (!epics.length) {
+      if (countEl) countEl.textContent = "";
+      var empty = el("span", "epics-empty");
+      empty.textContent = "No epics yet — create one to group your tickets.";
+      listEl.appendChild(empty);
+      return;
+    }
+    var shown = epics.filter(function (ep) { return !q || ep.name.toLowerCase().indexOf(q) !== -1; });
+    if (countEl) countEl.textContent = q
+      ? (shown.length + " of " + epics.length + " epics")
+      : (epics.length + (epics.length === 1 ? " epic" : " epics"));
+    if (!shown.length) {
+      var none = el("span", "epics-empty");
+      none.textContent = 'No epics match “' + q + '”.';
+      listEl.appendChild(none);
+      return;
+    }
+    shown.forEach(function (ep) {
+      var prog = epicProgress(ep.id);
+      var pill = el("span", "epic-pill");
+      pill.title = "View epic details";
+      // color-code each pill by its epic color so bodies of work are distinguishable
+      pill.style.background = ep.color + "1f"; // ~12% tint
+      pill.style.borderColor = ep.color + "80"; // ~50% alpha border
+      var dot = el("span", "ep-dot"); dot.style.background = ep.color; pill.appendChild(dot);
+      var nm = el("span", "ep-name"); nm.textContent = ep.name; pill.appendChild(nm);
+      var track = el("span", "ep-track");
+      var fill = el("span", "ep-fill"); fill.style.width = (prog.total ? prog.pct : 0) + "%"; fill.style.background = ep.color;
+      track.appendChild(fill); pill.appendChild(track);
+      var pct = el("span", "pct"); pct.textContent = (prog.total ? prog.pct : 0) + "%"; pill.appendChild(pct);
+      var x = el("span", "x"); x.innerHTML = "&times;"; x.title = "Delete epic";
+      x.addEventListener("click", function (e) { e.stopPropagation(); deleteEpic(ep.id); });
+      pill.addEventListener("click", function () { openEpicDetail(ep.id); });
+      pill.appendChild(x);
+      listEl.appendChild(pill);
+    });
+  }
+
+  // tickets linked to an epic, across all columns
+  function epicTickets(eid) {
+    var out = [];
+    COLUMNS.forEach(function (col) {
+      (cards[col.id] || []).forEach(function (c) { if (c.epic === eid) out.push(c); });
+    });
+    return out;
+  }
+  function epicProgress(eid) {
+    var ts = epicTickets(eid);
+    var by = { todo: 0, progress: 0, blocked: 0, done: 0 };
+    ts.forEach(function (t) { by[t.status] = (by[t.status] || 0) + 1; });
+    var total = ts.length;
+    var pct = total ? Math.round((by.done / total) * 100) : 0;
+    return { total: total, by: by, pct: pct, tickets: ts };
+  }
+
+  function deleteEpic(eid) {
+    var ep = findEpic(eid); if (!ep) return;
+    confirmDelete('The epic "' + ep.name + '" will be deleted. Tickets in it will keep their other details but lose the epic tag.', function () {
+      epics = epics.filter(function (e) { return e.id !== eid; });
+      Object.keys(cards).forEach(function (k) {
+        (cards[k] || []).forEach(function (c) { if (c.epic === eid) { c.epic = ""; c.updated = now(); } });
+      });
+      persistEpics(); persist(); renderEpics(); render();
+    });
+  }
+
+  // --- epic combobox: search existing epics or create a new one inline ---
+  var epicInput = byId("f-epic-input"), epicMenu = byId("epic-menu"), epicHidden = byId("f-epic");
+  var epicComboItems = [], epicActive = -1;
+
+  function epicNameById(id) { var e = findEpic(id); return e ? e.name : ""; }
+  function setEpicValue(id) {
+    epicHidden.value = id || "";
+    epicInput.value = id ? epicNameById(id) : "";
+  }
+  // kept name so openModal stays unchanged
+  function populateEpicSelect(selectedId) { setEpicValue(selectedId || ""); closeEpicMenu(); }
+
+  function buildEpicMenu() {
+    var q = epicInput.value.trim(), ql = q.toLowerCase();
+    epicMenu.innerHTML = ""; epicComboItems = []; epicActive = -1;
+    addEpicOpt({ type: "none", label: "— None —" });
+    epics.filter(function (ep) { return !ql || ep.name.toLowerCase().indexOf(ql) !== -1; })
+         .forEach(function (ep) { addEpicOpt({ type: "epic", id: ep.id, label: ep.name, color: ep.color }); });
+    var exact = epics.some(function (ep) { return ep.name.toLowerCase() === ql; });
+    if (q && !exact) addEpicOpt({ type: "create", label: '+ Create “' + q + '”', name: q });
+    renderEpicActive();
+  }
+  function addEpicOpt(item) {
+    var idx = epicComboItems.length;
+    var cls = "combo-opt" + (item.type === "create" ? " combo-create" : item.type === "none" ? " combo-none" : "");
+    var opt = el("div", cls);
+    if (item.type === "epic") { var dot = el("span", "combo-dot"); dot.style.background = item.color; opt.appendChild(dot); }
+    var txt = el("span", "combo-txt"); txt.textContent = item.label; opt.appendChild(txt);
+    if (item.type === "epic" && item.id === epicHidden.value) { var ck = el("span", "combo-check"); ck.textContent = "✓"; opt.appendChild(ck); }
+    opt.addEventListener("mousedown", function (e) { e.preventDefault(); chooseEpicOpt(item); });
+    opt.addEventListener("mousemove", function () { epicActive = idx; renderEpicActive(); });
+    epicMenu.appendChild(opt); epicComboItems.push(item);
+  }
+  function renderEpicActive() {
+    [].slice.call(epicMenu.children).forEach(function (c, i) { c.classList.toggle("active", i === epicActive); });
+  }
+  function chooseEpicOpt(item) {
+    if (item.type === "none") setEpicValue("");
+    else if (item.type === "epic") setEpicValue(item.id);
+    else if (item.type === "create") {
+      var ep = { id: uid(), name: item.name, description: "", color: EPIC_COLORS[epics.length % EPIC_COLORS.length], status: "active" };
+      epics.push(ep); persistEpics(); renderEpics();
+      setEpicValue(ep.id);
+    }
+    closeEpicMenu(); saveNow();
+  }
+  function openEpicMenu() { buildEpicMenu(); epicMenu.classList.add("open"); }
+  function closeEpicMenu() { epicMenu.classList.remove("open"); epicActive = -1; }
+  function scrollEpicActive() { var a = epicMenu.children[epicActive]; if (a && a.scrollIntoView) a.scrollIntoView({ block: "nearest" }); }
+
+  epicInput.addEventListener("focus", openEpicMenu);
+  epicInput.addEventListener("input", openEpicMenu);
+  epicInput.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowDown") { e.preventDefault(); if (!epicMenu.classList.contains("open")) openEpicMenu(); epicActive = Math.min(epicActive + 1, epicComboItems.length - 1); renderEpicActive(); scrollEpicActive(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); epicActive = Math.max(epicActive - 1, 0); renderEpicActive(); scrollEpicActive(); }
+    else if (e.key === "Enter") { if (epicMenu.classList.contains("open")) { e.preventDefault(); var it = epicComboItems[epicActive >= 0 ? epicActive : 1] || epicComboItems[0]; if (it) chooseEpicOpt(it); } }
+    else if (e.key === "Escape") { if (epicMenu.classList.contains("open")) { e.preventDefault(); e.stopPropagation(); closeEpicMenu(); setEpicValue(epicHidden.value); } }
+  });
+  epicInput.addEventListener("blur", function () { setTimeout(function () { closeEpicMenu(); setEpicValue(epicHidden.value); }, 120); });
+
+  // epic modal
+  var epicOverlay = byId("epic-overlay");
+  var pickedColor = EPIC_COLORS[0];
+  function buildSwatches() {
+    var wrap = byId("e-swatches"); wrap.innerHTML = "";
+    EPIC_COLORS.forEach(function (col) {
+      var s = el("span", "swatch" + (col === pickedColor ? " sel" : ""));
+      s.style.background = col;
+      s.addEventListener("click", function () {
+        pickedColor = col;
+        [].slice.call(wrap.children).forEach(function (c) { c.classList.remove("sel"); });
+        s.classList.add("sel");
+      });
+      wrap.appendChild(s);
+    });
+  }
+  function openEpicModal() {
+    pickedColor = EPIC_COLORS[0];
+    byId("e-name").value = ""; byId("e-desc").value = "";
+    byId("e-name-error").classList.remove("show"); byId("e-name").classList.remove("invalid");
+    buildSwatches();
+    epicOverlay.classList.add("open");
+    byId("e-name").focus();
+  }
+  function closeEpicModal() { epicOverlay.classList.remove("open"); }
+
+  byId("new-epic-btn").addEventListener("click", openEpicModal);
+  byId("epic-filter").addEventListener("input", renderEpics);
+  byId("e-cancel").addEventListener("click", closeEpicModal);
+  backdropClose(epicOverlay, closeEpicModal);
+  byId("e-name").addEventListener("input", function () { byId("e-name-error").classList.remove("show"); byId("e-name").classList.remove("invalid"); });
+  byId("e-save").addEventListener("click", function () {
+    var name = byId("e-name").value.trim();
+    if (!name) { byId("e-name-error").classList.add("show"); byId("e-name").classList.add("invalid"); byId("e-name").focus(); return; }
+    epics.push({ id: uid(), name: name, description: byId("e-desc").value.trim(), color: pickedColor, status: "active" });
+    persistEpics(); renderEpics(); closeEpicModal();
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && epicOverlay.classList.contains("open")) closeEpicModal(); });
+
+  // epic detail modal
+  var edOverlay = byId("epic-detail-overlay");
+  var STATUS_ORDER = ["todo", "progress", "blocked", "done"];
+  function openEpicDetail(eid) {
+    var ep = findEpic(eid); if (!ep) return;
+    var prog = epicProgress(eid);
+
+    byId("ed-dot").style.background = ep.color;
+    byId("ed-title").textContent = ep.name;
+    byId("ed-desc").textContent = ep.description || "No description.";
+
+    byId("ed-pct").textContent = prog.total ? prog.pct + "% complete" : "No tickets yet";
+    byId("ed-counts").textContent = prog.total ? (prog.by.done + " of " + prog.total + " done") : "";
+    byId("ed-fill").style.width = prog.pct + "%";
+    byId("ed-fill").style.background = ep.color;
+
+    var legend = byId("ed-legend"); legend.innerHTML = "";
+    STATUS_ORDER.forEach(function (s) {
+      var lg = el("span", "lg");
+      var sw = el("span", "sw"); sw.style.background = statusColor(s); lg.appendChild(sw);
+      lg.appendChild(document.createTextNode(STATUS_TITLE[s] + ": " + (prog.by[s] || 0)));
+      legend.appendChild(lg);
+    });
+
+    var ul = byId("ed-tickets"); ul.innerHTML = "";
+    if (!prog.total) {
+      var empty = el("li", "ed-empty"); empty.textContent = "No tickets are linked to this epic yet. Assign this epic when creating or editing a ticket.";
+      ul.appendChild(empty);
+    } else {
+      // group by status order
+      STATUS_ORDER.forEach(function (s) {
+        prog.tickets.filter(function (t) { return t.status === s; }).forEach(function (t) {
+          var li = el("li", "ed-ticket");
+          var id = el("span", "et-id"); id.textContent = t.ticketId; li.appendChild(id);
+          var title = el("span", "et-title"); title.textContent = t.title; li.appendChild(title);
+          var tag = el("span", "status-tag " + t.status); tag.textContent = STATUS_TITLE[t.status]; li.appendChild(tag);
+          var unlink = el("button", "et-unlink"); unlink.innerHTML = "&times;"; unlink.title = "Remove from this epic";
+          unlink.addEventListener("click", function (e) {
+            e.stopPropagation();
+            confirmDelete("Ticket " + t.ticketId + ' "' + t.title + '" will be removed from this epic. The ticket itself will not be deleted.', function () {
+              t.epic = ""; t.updated = now(); addLog(t, "removed from epic");
+              persist(); render(); openEpicDetail(eid); // refresh the open view
+            }, "Remove from epic?");
+          });
+          li.appendChild(unlink);
+          li.addEventListener("click", function () { closeEpicDetail(); openModal(t.id, t.status); });
+          ul.appendChild(li);
+        });
+      });
+    }
+    edOverlay.classList.add("open");
+  }
+  function closeEpicDetail() { edOverlay.classList.remove("open"); }
+  function statusColor(s) {
+    return { todo: "#6366f1", progress: "#f59e0b", blocked: "#ef4444", done: "#10b981" }[s] || "#ccc";
+  }
+  byId("ed-close").addEventListener("click", closeEpicDetail);
+  backdropClose(edOverlay, closeEpicDetail);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && edOverlay.classList.contains("open")) closeEpicDetail(); });
+
+  // confirm modal wiring
+  var confirmOverlay = byId("confirm-overlay");
+  function closeConfirm() { confirmOverlay.classList.remove("open"); _confirmCb = null; }
+  byId("c-cancel").addEventListener("click", closeConfirm);
+  backdropClose(confirmOverlay, closeConfirm);
+  byId("c-confirm").addEventListener("click", function () {
+    var cb = _confirmCb; closeConfirm(); if (cb) cb();
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && confirmOverlay.classList.contains("open")) closeConfirm(); });
+
+  // filter controls
+  ["flt-priority", "flt-epic", "flt-label"].forEach(function (id) {
+    byId(id).addEventListener("change", render);
+  });
+  byId("flt-search").addEventListener("input", render);
+  byId("flt-clear").addEventListener("click", function () {
+    byId("flt-search").value = "";
+    ["flt-priority", "flt-epic", "flt-label"].forEach(function (id) { byId(id).value = ""; });
+    render();
+  });
+
+  // --- notes (multi-note: subjects, priority, rich text, checklists) ---
+  var STORE_NOTES2 = "vytzone.notes.v2";
+  var PRIO_RANK = { urgent: 4, high: 3, medium: 2, low: 1, "": 0 };
+  var notesData = loadNotes();
+  var activeNoteId = null;
+  var noteSaveTimer = null;
+
+  function loadNotes() {
+    var v2 = load(STORE_NOTES2, null);
+    if (v2 && Array.isArray(v2)) return v2;
+    // migrate the old single text note, if any
+    var old = load(STORE_NOTES, "");
+    var arr = [];
+    if (old && old.trim()) {
+      arr.push({ id: uid(), subject: "General Notes", priority: "", body: esc(old).replace(/\n/g, "<br>"), created: now(), updated: now() });
+      save(STORE_NOTES2, arr);
+    }
+    return arr;
+  }
+  function persistNotes() { save(STORE_NOTES2, notesData); }
+  function findNote(id) { for (var i = 0; i < notesData.length; i++) if (notesData[i].id === id) return notesData[i]; return null; }
+
+  function noteTodoCounts(html) {
+    var d = document.createElement("div"); d.innerHTML = html || "";
+    var boxes = d.querySelectorAll('input[type=checkbox]');
+    var done = 0; boxes.forEach(function (b) { if (b.hasAttribute("checked")) done++; });
+    return { total: boxes.length, done: done };
+  }
+
+  function renderNoteList() {
+    var ul = byId("note-list"); ul.innerHTML = "";
+    var q = byId("note-search").value.trim().toLowerCase();
+    var sort = byId("note-sort").value;
+    var items = notesData.filter(function (n) {
+      if (!q) return true;
+      return (n.subject || "").toLowerCase().indexOf(q) !== -1 || stripHTML(n.body || "").toLowerCase().indexOf(q) !== -1;
+    });
+    items.sort(function (a, b) {
+      if (sort === "subject") return (a.subject || "").toLowerCase().localeCompare((b.subject || "").toLowerCase());
+      if (sort === "created") return (b.created || "").localeCompare(a.created || "");
+      if (sort === "priority") { var d = (PRIO_RANK[b.priority] || 0) - (PRIO_RANK[a.priority] || 0); return d !== 0 ? d : (b.updated || "").localeCompare(a.updated || ""); }
+      return (b.updated || "").localeCompare(a.updated || ""); // updated (default)
+    });
+    if (!items.length) {
+      var em = el("li", "note-list-empty");
+      em.textContent = notesData.length ? "No notes match your search." : "No notes yet. Create one!";
+      ul.appendChild(em); return;
+    }
+    items.forEach(function (n) {
+      var li = el("li", "note-list-item" + (n.id === activeNoteId ? " active" : ""));
+      var top = el("div", "nli-top");
+      var title = el("span", "nli-title" + ((n.subject || "").trim() ? "" : " untitled"));
+      title.textContent = (n.subject || "").trim() || "Untitled note";
+      top.appendChild(title);
+      if (n.priority) { var pr = el("span", "badge " + n.priority); pr.textContent = cap(n.priority); top.appendChild(pr); }
+      li.appendChild(top);
+      var preview = stripHTML(n.body || "").replace(/\s+/g, " ").trim();
+      if (preview) { var pv = el("div", "nli-preview"); pv.textContent = preview; li.appendChild(pv); }
+      var foot = el("div", "nli-foot");
+      var dt = el("span", "nli-date"); dt.textContent = fmtDateTime(n.updated); foot.appendChild(dt);
+      var tc = noteTodoCounts(n.body);
+      if (tc.total) { var tg = el("span", "nli-todo"); tg.textContent = "☑ " + tc.done + "/" + tc.total; foot.appendChild(tg); }
+      li.appendChild(foot);
+      li.addEventListener("click", function () { openNote(n.id); });
+      ul.appendChild(li);
+    });
+  }
+
+  function openNote(id) {
+    var n = findNote(id); if (!n) return;
+    activeNoteId = id;
+    byId("note-subject").value = n.subject || "";
+    byId("note-priority").value = n.priority || "";
+    byId("note-body").innerHTML = sanitizeNoteHTML(n.body || "");
+    normalizeNoteBlocks();
+    syncTodoClasses();
+    setNoteMeta(n, false);
+    byId("note-overlay").classList.add("open");
+    autosizeSubject(); // measure after the modal is visible
+    setNoteTocOpen(false); // table of contents starts collapsed
+    renderNoteToc();
+    renderNoteList();
+  }
+  function closeNote() {
+    if (activeNoteId) saveActiveNote(); // flush any pending edits
+    byId("note-overlay").classList.remove("open");
+    activeNoteId = null;
+    renderNoteList();
+  }
+
+  function newNote() {
+    var n = { id: uid(), subject: "", priority: "", body: "", created: now(), updated: now() };
+    notesData.unshift(n); persistNotes();
+    openNote(n.id);
+    byId("note-subject").focus();
+  }
+
+  function deleteActiveNote() {
+    if (!activeNoteId) return;
+    confirmDelete("This note will be permanently deleted. This cannot be undone.", function () {
+      notesData = notesData.filter(function (n) { return n.id !== activeNoteId; });
+      activeNoteId = null; persistNotes();
+      byId("note-overlay").classList.remove("open");
+      renderNoteList();
+    });
+  }
+
+  function setNoteMeta(n, justSaved) {
+    byId("note-meta").innerHTML = (justSaved ? '<span class="meta-saved">Saved ✓</span> · ' : "") +
+      "Updated " + esc(fmtDateTime(n.updated)) + " · Created " + esc(fmtDateTime(n.created));
+  }
+
+  function saveActiveNote() {
+    if (!activeNoteId) return;
+    var n = findNote(activeNoteId); if (!n) return;
+    n.subject = byId("note-subject").value;
+    n.priority = byId("note-priority").value;
+    n.body = sanitizeNoteHTML(byId("note-body").innerHTML);
+    n.updated = now();
+    persistNotes(); renderNoteList(); setNoteMeta(n, true);
+  }
+  function saveActiveNoteDebounced() { clearTimeout(noteSaveTimer); noteSaveTimer = setTimeout(saveActiveNote, 400); }
+
+  function syncTodoClasses() {
+    byId("note-body").querySelectorAll(".todo").forEach(function (row) {
+      var cb = row.querySelector('input[type=checkbox]');
+      row.classList.toggle("done", !!(cb && cb.checked));
+    });
+  }
+
+  // sanitizer that also allows checklist items (checkbox inputs + .todo wrappers)
+  function sanitizeNoteHTML(html) {
+    var allowed = { B: 1, STRONG: 1, I: 1, EM: 1, U: 1, A: 1, UL: 1, OL: 1, LI: 1, BR: 1, P: 1, DIV: 1, SPAN: 1, FONT: 1, INPUT: 1, H1: 1, H2: 1, H3: 1, IMG: 1, TABLE: 1, THEAD: 1, TBODY: 1, TFOOT: 1, TR: 1, TD: 1, TH: 1 };
+    var keepClass = { todo: 1, "todo-text": 1, done: 1 };
+    function safeColor(c) {
+      if (!c) return null; c = String(c).trim().toLowerCase();
+      if (/^#[0-9a-f]{3}([0-9a-f]{3})?$/.test(c)) return c;
+      if (/^rgb\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)$/.test(c)) return c;
+      if (/^[a-z]{3,20}$/.test(c)) return c;
+      return null;
+    }
+    var wrap = document.createElement("div"); wrap.innerHTML = html;
+    (function clean(node) {
+      Array.prototype.slice.call(node.childNodes).forEach(function (n) {
+        if (n.nodeType === 1) {
+          if (!allowed[n.tagName]) { while (n.firstChild) node.insertBefore(n.firstChild, n); node.removeChild(n); return; }
+          if (n.tagName === "INPUT") {
+            if ((n.getAttribute("type") || "").toLowerCase() !== "checkbox") { node.removeChild(n); return; }
+            var wasChecked = n.hasAttribute("checked") || n.checked;
+            Array.prototype.slice.call(n.attributes).forEach(function (a) { n.removeAttribute(a.name); });
+            n.setAttribute("type", "checkbox"); if (wasChecked) n.setAttribute("checked", "checked");
+            return;
+          }
+          if (n.tagName === "IMG") {
+            var isrc = n.getAttribute("src") || "";
+            var ialt = n.getAttribute("alt") || "";
+            Array.prototype.slice.call(n.attributes).forEach(function (a) { n.removeAttribute(a.name); });
+            if (/^data:image\/(png|jpeg|jpg|gif|webp);/i.test(isrc) || /^https?:\/\//i.test(isrc)) {
+              n.setAttribute("src", isrc); if (ialt) n.setAttribute("alt", ialt);
+            } else { node.removeChild(n); }
+            return;
+          }
+          var cls = (n.getAttribute("class") || "").split(/\s+/).filter(function (c) { return keepClass[c]; }).join(" ");
+          var href = (n.tagName === "A") ? n.getAttribute("href") : null;
+          var color = null;
+          if (n.tagName === "SPAN" || n.tagName === "FONT") {
+            color = safeColor((n.style && n.style.color) || n.getAttribute("color"));
+          }
+          Array.prototype.slice.call(n.attributes).forEach(function (a) { n.removeAttribute(a.name); });
+          if (cls) n.setAttribute("class", cls);
+          if (color) n.setAttribute("style", "color:" + color);
+          if (n.tagName === "A" && href && /^https?:|^mailto:/i.test(href)) {
+            n.setAttribute("href", href); n.setAttribute("target", "_blank"); n.setAttribute("rel", "noopener noreferrer");
+          }
+          clean(n);
+        } else if (n.nodeType !== 3) { node.removeChild(n); }
+      });
+    })(wrap);
+    return wrap.innerHTML;
+  }
+
+  // Thorough "clear formatting": strips bold/italic/etc, removes links,
+  // turns bullet/numbered lists back into plain lines, and demotes headings.
+  function clearFormatting() {
+    document.execCommand("removeFormat", false, null);
+    document.execCommand("unlink", false, null);
+    try { if (document.queryCommandState("insertUnorderedList")) document.execCommand("insertUnorderedList", false, null); } catch (e) {}
+    try { if (document.queryCommandState("insertOrderedList")) document.execCommand("insertOrderedList", false, null); } catch (e) {}
+    var blk = ""; try { blk = (document.queryCommandValue("formatBlock") || "").toLowerCase(); } catch (e) {}
+    if (blk === "h1" || blk === "h2" || blk === "h3") document.execCommand("formatBlock", false, "p");
+  }
+
+  function insertNoteCheckbox() {
+    var body = byId("note-body"); body.focus();
+    var sel = window.getSelection(); if (!sel.rangeCount) return;
+    var range = sel.getRangeAt(0); range.deleteContents();
+    var div = document.createElement("div"); div.className = "todo";
+    var cb = document.createElement("input"); cb.type = "checkbox";
+    var sp = document.createElement("span"); sp.className = "todo-text"; sp.innerHTML = " ";
+    div.appendChild(cb); div.appendChild(sp);
+    range.insertNode(div);
+    var r2 = document.createRange(); r2.setStart(sp, 0); r2.collapse(true);
+    sel.removeAllRanges(); sel.addRange(r2);
+    saveActiveNoteDebounced();
+  }
+
+  function createTicketFromNote() {
+    if (!activeNoteId) return;
+    saveActiveNote(); // make sure latest edits are captured
+    var n = findNote(activeNoteId); if (!n) return;
+    var title = (n.subject || "").trim();
+    if (!title) {
+      var txt = stripHTML(n.body || "").replace(/\s+/g, " ").trim();
+      title = txt ? txt.slice(0, 80) : "Untitled note";
+    }
+    var t = newTicket({ title: title, desc: n.body || "", priority: n.priority || "medium", status: "todo" });
+    addLog(t, "created from note");
+    cards.todo.push(t);
+    persist(); render();
+    // jump to the board and open the new ticket for review
+    var boardTab = document.querySelector('.tab[data-view="board"]');
+    if (boardTab) boardTab.click();
+    openModal(t.id, "todo");
+  }
+
+  // --- meeting notes: turn a Granola transcript/summary into a structured note ---
+  function mdInline(s) {
+    // s is already HTML-escaped; turn lightweight markdown into safe inline tags
+    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, function (m, t, u) { return '<a href="' + u + '" target="_blank" rel="noopener noreferrer">' + t + '</a>'; });
+    s = s.replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/__([^_]+)__/g, "<b>$1</b>");
+    s = s.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<i>$2</i>");
+    s = s.replace(/(^|[\s(])((?:https?:\/\/)[^\s<)]+)/g, function (m, pre, url) { return pre + '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + url + "</a>"; });
+    return s;
+  }
+  function mdToNoteHTML(md) {
+    var lines = String(md).replace(/\r\n/g, "\n").split("\n");
+    var out = [], listType = null;
+    function closeList() { if (listType) { out.push("</" + listType + ">"); listType = null; } }
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].replace(/\s+$/, ""), m;
+      if (!line.trim()) { closeList(); continue; }
+      if ((m = line.match(/^(#{1,3})\s+(.*)$/))) { closeList(); var lvl = m[1].length; out.push("<h" + lvl + ">" + mdInline(esc(m[2])) + "</h" + lvl + ">"); continue; }
+      if ((m = line.match(/^\s*[-*]\s+\[([ xX])\]\s+(.*)$/))) { closeList(); var ck = m[1].toLowerCase() === "x"; out.push('<div class="todo' + (ck ? " done" : "") + '"><input type="checkbox"' + (ck ? " checked" : "") + '><span class="todo-text">' + mdInline(esc(m[2])) + "</span></div>"); continue; }
+      if ((m = line.match(/^\s*\d+[.)]\s+(.*)$/))) { if (listType !== "ol") { closeList(); out.push("<ol>"); listType = "ol"; } out.push("<li>" + mdInline(esc(m[1])) + "</li>"); continue; }
+      if ((m = line.match(/^\s*[-*]\s+(.*)$/))) { if (listType !== "ul") { closeList(); out.push("<ul>"); listType = "ul"; } out.push("<li>" + mdInline(esc(m[1])) + "</li>"); continue; }
+      closeList(); out.push("<p>" + mdInline(esc(line)) + "</p>");
+    }
+    closeList();
+    return out.join("");
+  }
+  function ticketsFromNoteChecklist(n) {
+    var d = document.createElement("div"); d.innerHTML = n.body || "";
+    var rows = Array.prototype.slice.call(d.querySelectorAll(".todo")).filter(function (row) {
+      var cb = row.querySelector('input[type=checkbox]');
+      if (!cb) return false;                                   // must be a checklist item
+      var checked = cb.checked || cb.hasAttribute("checked");  // treat either as done
+      var tx = row.querySelector(".todo-text");
+      var text = (tx ? tx.textContent : row.textContent).trim();
+      return text && !checked;                                 // only unchecked items become tickets
+    });
+    if (!rows.length) return { made: 0, epic: "" };
+    // group all action items under an epic named after the note subject (reuse if it already exists)
+    var epicName = ((n.subject || "Meeting").trim()) || "Meeting";
+    var ep = null;
+    for (var i = 0; i < epics.length; i++) { if (epics[i].name.toLowerCase() === epicName.toLowerCase()) { ep = epics[i]; break; } }
+    if (!ep) {
+      ep = { id: uid(), name: epicName, description: "Action items from meeting note", color: EPIC_COLORS[epics.length % EPIC_COLORS.length], status: "active" };
+      epics.push(ep); persistEpics();
+    }
+    var made = 0;
+    rows.forEach(function (row) {
+      var tx = row.querySelector(".todo-text");
+      var text = (tx ? tx.textContent : row.textContent).trim();
+      var t = newTicket({ title: text.slice(0, 120), desc: "From meeting note: <b>" + esc(n.subject || "Meeting") + "</b>", priority: "medium", status: "todo", epic: ep.id });
+      addLog(t, "created from meeting note");
+      cards.todo.push(t); made++;
+    });
+    if (made) { persist(); render(); renderEpics(); }
+    return { made: made, epic: epicName };
+  }
+  function openMeeting() {
+    byId("meeting-subject").value = "";
+    byId("meeting-input").value = "";
+    byId("meeting-make-tickets").checked = false;
+    byId("meeting-overlay").classList.add("open");
+    byId("meeting-input").focus();
+  }
+  function closeMeeting() { byId("meeting-overlay").classList.remove("open"); }
+  function createMeetingNote() {
+    var md = byId("meeting-input").value;
+    if (!md.trim()) { byId("meeting-input").focus(); return; }
+    var subject = byId("meeting-subject").value.trim();
+    if (!subject) { var hm = md.match(/^\s*#\s+(.+)$/m); subject = hm ? hm[1].trim() : ("Meeting note — " + fmtDate(now())); }
+    var n = { id: uid(), subject: subject, priority: "", body: sanitizeNoteHTML(mdToNoteHTML(md)), created: now(), updated: now() };
+    notesData.unshift(n); persistNotes();
+    var makeTickets = byId("meeting-make-tickets").checked;
+    closeMeeting();
+    openNote(n.id);
+    if (makeTickets) {
+      var res = ticketsFromNoteChecklist(n);
+      byId("note-meta").innerHTML = '<span class="meta-saved">Created ' + res.made + ' ticket' + (res.made === 1 ? "" : "s") +
+        (res.made ? ' in epic “' + esc(res.epic) + '” ✓' : ' — no open action items found') + '</span>';
+    }
+  }
+  byId("note-meeting").addEventListener("click", openMeeting);
+  byId("meeting-cancel").addEventListener("click", closeMeeting);
+  byId("meeting-create").addEventListener("click", createMeetingNote);
+  backdropClose(byId("meeting-overlay"), closeMeeting);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && byId("meeting-overlay").classList.contains("open")) closeMeeting(); });
+
+  // wiring
+  byId("note-new").addEventListener("click", newNote);
+  byId("note-to-ticket").addEventListener("click", createTicketFromNote);
+  byId("note-delete").addEventListener("click", deleteActiveNote);
+  byId("note-close").addEventListener("click", closeNote);
+  backdropClose(byId("note-overlay"), closeNote);
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && byId("note-overlay").classList.contains("open")) closeNote(); });
+  byId("note-search").addEventListener("input", renderNoteList);
+  byId("note-sort").addEventListener("change", renderNoteList);
+  function autosizeSubject() { var s = byId("note-subject"); s.style.height = "auto"; s.style.height = s.scrollHeight + "px"; }
+  byId("note-subject").addEventListener("input", function () { autosizeSubject(); saveActiveNoteDebounced(); });
+  byId("note-subject").addEventListener("keydown", function (e) { if (e.key === "Enter") e.preventDefault(); }); // title stays one line, just wraps
+  byId("note-priority").addEventListener("change", saveActiveNote);
+  byId("note-body").addEventListener("input", saveActiveNoteDebounced);
+
+  /* ---------- Screenshots / images in notes (paste + drag & drop) ---------- */
+  // Screenshots are embedded straight into the note. To keep browser storage
+  // from filling up, big images are downscaled (max 1400px) and re-compressed
+  // before they're inserted.
+  function compressImageFile(file, cb) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var img = new Image();
+      img.onload = function () {
+        var maxDim = 1400;
+        var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+        var scale = Math.min(1, maxDim / Math.max(w, h));
+        var cw = Math.round(w * scale), ch = Math.round(h * scale);
+        try {
+          var canvas = document.createElement("canvas");
+          canvas.width = cw; canvas.height = ch;
+          var ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, cw, ch);
+          // PNG keeps text crisp for screenshots; fall back to JPEG if it's huge.
+          var out = canvas.toDataURL("image/png");
+          if (out.length > 900000) out = canvas.toDataURL("image/jpeg", 0.82);
+          cb(out);
+        } catch (e) { cb(reader.result); } // canvas can taint on some inputs — use original
+      };
+      img.onerror = function () { cb(reader.result); };
+      img.src = reader.result;
+    };
+    reader.onerror = function () { cb(null); };
+    reader.readAsDataURL(file);
+  }
+  function insertNoteImage(file) {
+    if (!file || file.type.indexOf("image/") !== 0) return;
+    var body = byId("note-body"); body.focus();
+    compressImageFile(file, function (dataUrl) {
+      if (!dataUrl) return;
+      body.focus();
+      var img = document.createElement("img");
+      img.src = dataUrl; img.alt = file.name || "screenshot";
+      var sel = window.getSelection(), range = null;
+      if (sel && sel.rangeCount && body.contains(sel.anchorNode)) range = sel.getRangeAt(0);
+      if (range) {
+        range.deleteContents(); range.insertNode(img);
+        var after = document.createElement("div"); after.appendChild(document.createElement("br"));
+        if (img.parentNode) img.parentNode.insertBefore(after, img.nextSibling);
+        var r2 = document.createRange(); r2.setStart(after, 0); r2.collapse(true);
+        sel.removeAllRanges(); sel.addRange(r2);
+      } else {
+        body.appendChild(img);
+        body.appendChild(document.createElement("div")).appendChild(document.createElement("br"));
+      }
+      saveActiveNote();
+    });
+  }
+  byId("note-body").addEventListener("paste", function (e) {
+    var items = (e.clipboardData && e.clipboardData.items) || [];
+    var handled = false;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === "file" && items[i].type.indexOf("image/") === 0) {
+        var f = items[i].getAsFile();
+        if (f) { insertNoteImage(f); handled = true; break; } // one paste = one image
+        // The clipboard often holds several copies of the same screenshot
+        // (e.g. PNG + TIFF). Insert only the first so it isn't duplicated.
+      }
+    }
+    if (handled) e.preventDefault(); // don't also paste the image's file path as text
+  });
+  byId("note-body").addEventListener("dragover", function (e) {
+    if (e.dataTransfer && Array.prototype.some.call(e.dataTransfer.items || [], function (it) { return it.kind === "file"; })) {
+      e.preventDefault(); e.dataTransfer.dropEffect = "copy";
+    }
+  });
+  byId("note-body").addEventListener("drop", function (e) {
+    var files = (e.dataTransfer && e.dataTransfer.files) || [];
+    var imgs = Array.prototype.filter.call(files, function (f) { return f.type.indexOf("image/") === 0; });
+    if (imgs.length) {
+      e.preventDefault();
+      // place the cursor where the image was dropped, if the browser supports it
+      try {
+        var r = document.caretRangeFromPoint ? document.caretRangeFromPoint(e.clientX, e.clientY) : null;
+        if (r) { var s = window.getSelection(); s.removeAllRanges(); s.addRange(r); }
+      } catch (err) {}
+      imgs.forEach(insertNoteImage);
+    }
+  });
+  // Click an image to view it full-size
+  (function () {
+    var lb = document.createElement("div"); lb.className = "note-img-lightbox";
+    var lbImg = document.createElement("img"); lb.appendChild(lbImg);
+    document.body.appendChild(lb);
+    lb.addEventListener("click", function () { lb.classList.remove("show"); });
+    byId("note-body").addEventListener("click", function (e) {
+      if (e.target && e.target.tagName === "IMG") { lbImg.src = e.target.src; lb.classList.add("show"); }
+    });
+
+    // Hover delete button: floats over the top-right of whichever note image
+    // the pointer is on, so a screenshot can be removed with one click.
+    var body = byId("note-body");
+    var delBtn = document.createElement("button");
+    delBtn.className = "note-img-delete"; delBtn.type = "button";
+    delBtn.title = "Delete image"; delBtn.textContent = "×"; // ×
+    document.body.appendChild(delBtn);
+    var targetImg = null;
+    function positionFor(img) {
+      var r = img.getBoundingClientRect();
+      delBtn.style.top = (r.top + 6) + "px";
+      delBtn.style.left = (r.right - 32) + "px";
+    }
+    function showFor(img) { targetImg = img; positionFor(img); delBtn.classList.add("show"); }
+    function hide() { targetImg = null; delBtn.classList.remove("show"); }
+    body.addEventListener("mouseover", function (e) {
+      if (e.target && e.target.tagName === "IMG") showFor(e.target);
+    });
+    body.addEventListener("mouseout", function (e) {
+      // keep the button visible while the pointer moves onto the button itself
+      if (e.relatedTarget === delBtn) return;
+      if (e.target && e.target.tagName === "IMG") hide();
+    });
+    delBtn.addEventListener("mouseleave", function () { hide(); });
+    body.addEventListener("scroll", function () { if (targetImg) positionFor(targetImg); });
+    delBtn.addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      if (targetImg && targetImg.parentNode) targetImg.parentNode.removeChild(targetImg);
+      hide();
+      saveActiveNote();
+    });
+  })();
+
+  // Backspace on an empty checkbox row deletes the whole row in one press
+  byId("note-body").addEventListener("keydown", function (e) {
+    if (e.key !== "Backspace") return;
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    var range = sel.getRangeAt(0);
+    if (!range.collapsed) return;
+    var node = range.startContainer;
+    var todoRow = null;
+    // Find if we're inside a .todo div
+    var check = node.nodeType === Node.TEXT_NODE ? node.parentNode : node;
+    while (check && check !== byId("note-body")) {
+      if (check.classList && check.classList.contains("todo")) { todoRow = check; break; }
+      check = check.parentNode;
+    }
+    if (!todoRow) return;
+    var textSpan = todoRow.querySelector(".todo-text");
+    var isEmpty = !textSpan || textSpan.textContent.trim() === "";
+    var atStart = range.startOffset === 0;
+    if (isEmpty || atStart) {
+      e.preventDefault();
+      var body = byId("note-body");
+      // Place cursor on the line before the todo row
+      var prev = todoRow.previousSibling;
+      todoRow.parentNode.removeChild(todoRow);
+      if (prev) {
+        var r = document.createRange();
+        if (prev.nodeType === Node.TEXT_NODE) {
+          r.setStart(prev, prev.textContent.length); r.collapse(true);
+        } else {
+          r.setStartAfter(prev); r.collapse(true);
+        }
+        sel.removeAllRanges(); sel.addRange(r);
+      }
+      saveActiveNoteDebounced();
+    }
+  });
+  // Tab / Shift+Tab: nest (indent) or un-nest (outdent) the current list item,
+  // so you can build sub-bullets / sub-numbers under bulleted and numbered lists.
+  byId("note-body").addEventListener("keydown", function (e) {
+    if (e.key !== "Tab") return;
+    var sel = window.getSelection(); if (!sel || !sel.rangeCount) return;
+    var node = sel.anchorNode; if (!node) return;
+    var el = node.nodeType === Node.TEXT_NODE ? node.parentNode : node;
+    var li = (el && el.closest) ? el.closest("li") : null;
+    if (!li || !byId("note-body").contains(li)) return; // only hijack Tab inside a list
+    e.preventDefault();
+    try { document.execCommand("styleWithCSS", false, false); } catch (_) {}
+    if (e.shiftKey) {
+      document.execCommand("outdent", false, null);
+    } else if (li.previousElementSibling) {
+      // need a preceding item to nest beneath; otherwise Tab does nothing here
+      document.execCommand("indent", false, null);
+    }
+    saveActiveNoteDebounced();
+    updateNoteToolbarState();
+  });
+  // ⌘K / Ctrl+K inserts a link in the note body
+  byId("note-body").addEventListener("keydown", function (e) {
+    if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+      e.preventDefault(); openLinkPop(byId("note-body"));
+    }
+  });
+  // Notion-style shortcut: typing "[] " converts the current line to a checkbox
+  byId("note-body").addEventListener("keydown", function (e) {
+    if (e.key !== " ") return;
+    var sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    var range = sel.getRangeAt(0);
+    if (!range.collapsed) return;
+    var node = range.startContainer;
+    if (node.nodeType !== Node.TEXT_NODE) return;
+    var textBefore = node.textContent.substring(0, range.startOffset);
+    if (textBefore === "[]") {
+      e.preventDefault();
+      var delRange = document.createRange();
+      delRange.setStart(node, 0);
+      delRange.setEnd(node, 2);
+      delRange.deleteContents();
+      insertNoteCheckbox();
+      return;
+    }
+    if (textBefore === "*") {
+      e.preventDefault();
+      var delRange2 = document.createRange();
+      delRange2.setStart(node, 0);
+      delRange2.setEnd(node, 1);
+      delRange2.deleteContents();
+      document.execCommand("insertUnorderedList", false, null);
+      saveActiveNoteDebounced();
+      return;
+    }
+    if (/^\d+\.$/.test(textBefore)) {
+      e.preventDefault();
+      var delRange3 = document.createRange();
+      delRange3.setStart(node, 0);
+      delRange3.setEnd(node, textBefore.length);
+      delRange3.deleteContents();
+      document.execCommand("insertOrderedList", false, null);
+      saveActiveNoteDebounced();
+      return;
+    }
+  });
+
+  // swatch clicks: apply colour without losing the text selection
+  byId("note-color-pop").addEventListener("mousedown", function (e) {
+    var s = e.target.closest(".ct-swatch"); if (!s) return;
+    e.preventDefault();
+    applyNoteColor(s.getAttribute("data-color") || "");
+    toggleColorPop(false);
+  });
+  // close the colour palette when clicking elsewhere
+  document.addEventListener("mousedown", function (e) {
+    var pop = byId("note-color-pop"); if (!pop || !pop.classList.contains("show")) return;
+    if (e.target.closest(".ct-color-wrap")) return;
+    toggleColorPop(false);
+  });
+
+  byId("note-toolbar").addEventListener("mousedown", function (e) {
+    var b = e.target.closest(".ct-btn"); if (!b) return;
+    e.preventDefault();
+    var cmd = b.getAttribute("data-cmd");
+    if (cmd === "color") { toggleColorPop(); return; }
+    byId("note-body").focus();
+    if (cmd === "insertTable") { insertNoteTable(3, 3); updateNoteToolbarState(); return; }
+    if (cmd === "rowAbove") { insertTableRow("above"); return; }
+    if (cmd === "rowBelow") { insertTableRow("below"); return; }
+    if (cmd === "colLeft") { insertTableCol("left"); return; }
+    if (cmd === "colRight") { insertTableCol("right"); return; }
+    if (cmd === "delRow") { deleteTableRow(); return; }
+    if (cmd === "delCol") { deleteTableCol(); return; }
+    if (cmd === "delTable") { deleteTable(); return; }
+    if (cmd === "h1" || cmd === "h2" || cmd === "h3") {
+      var isOn = false; try { isOn = document.queryCommandValue("formatBlock").toLowerCase() === cmd; } catch (err) {}
+      document.execCommand("formatBlock", false, isOn ? "p" : cmd);
+      saveActiveNoteDebounced();
+    }
+    else if (cmd === "checkbox") { insertNoteCheckbox(); }
+    else if (cmd === "createLink") {
+      var url = prompt("Link URL:", "https://");
+      if (url) { try { new URL(url); } catch (err) { url = "https://" + url.replace(/^https?:\/\//, ""); } document.execCommand("createLink", false, url); saveActiveNoteDebounced(); }
+    }
+    else if (cmd === "removeFormat") { clearFormatting(); saveActiveNoteDebounced(); }
+    else { document.execCommand(cmd, false, null); saveActiveNoteDebounced(); }
+    updateNoteToolbarState();
+  });
+  ["keyup", "mouseup", "focus"].forEach(function (ev) { byId("note-body").addEventListener(ev, updateNoteToolbarState); });
+
+  /* ---------- Note table of contents ---------- */
+  function setNoteTocOpen(open) {
+    var toc = byId("note-toc"), btn = byId("note-toc-toggle");
+    toc.classList.toggle("open", open);
+    byId("note-overlay").querySelector(".note-modal").classList.toggle("toc-open", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    btn.title = open ? "Hide table of contents" : "Show table of contents";
+  }
+  function noteHeadings() {
+    return Array.prototype.filter.call(byId("note-body").querySelectorAll("h1, h2, h3"), function (h) {
+      return h.textContent.trim() !== "";
+    });
+  }
+  function renderNoteToc() {
+    var list = byId("note-toc-list"), heads = noteHeadings();
+    list.innerHTML = "";
+    byId("note-toc-count").textContent = heads.length ? String(heads.length) : "";
+    if (!heads.length) {
+      var empty = document.createElement("li");
+      empty.className = "note-toc-empty";
+      empty.textContent = "No headings yet. Use H1, H2 or H3 in the toolbar and they'll show up here.";
+      list.appendChild(empty);
+      return;
+    }
+    // Indent relative to the biggest heading used, so a note with only H2/H3 still starts at the left edge
+    var top = Math.min.apply(null, heads.map(function (h) { return +h.tagName.charAt(1); }));
+    heads.forEach(function (h, i) {
+      var li = document.createElement("li");
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "note-toc-link lvl-" + (+h.tagName.charAt(1) - top + 1);
+      b.textContent = h.textContent.trim();
+      b.title = b.textContent;
+      b.addEventListener("click", function () { jumpToNoteHeading(i); });
+      li.appendChild(b); list.appendChild(li);
+    });
+    updateNoteTocCurrent();
+  }
+  function jumpToNoteHeading(i) {
+    var body = byId("note-body"), h = noteHeadings()[i]; if (!h) return;
+    var smooth = !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    // Put the cursor at the start of the heading first (so it doesn't fight the scroll)
+    try {
+      body.focus({ preventScroll: true });
+      var range = document.createRange(); range.selectNodeContents(h); range.collapse(true);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    } catch (e) {}
+    // Then scroll the note so the heading sits at the top
+    var y = body.scrollTop + h.getBoundingClientRect().top - body.getBoundingClientRect().top - 8;
+    body.scrollTo({ top: y, behavior: smooth ? "smooth" : "auto" });
+    // If the whole window is scrolled so the note is off-screen, bring it into view too
+    var br = body.getBoundingClientRect();
+    if (br.top < 0 || br.top > window.innerHeight - 80) body.scrollIntoView({ block: "start", behavior: smooth ? "smooth" : "auto" });
+    // Briefly highlight the heading
+    h.classList.add("toc-flash");
+    setTimeout(function () { h.classList.remove("toc-flash"); if (!h.className) h.removeAttribute("class"); }, 900);
+  }
+  function updateNoteTocCurrent() {
+    var body = byId("note-body"), heads = noteHeadings();
+    var links = byId("note-toc-list").querySelectorAll(".note-toc-link");
+    var limit = body.getBoundingClientRect().top + 40, cur = -1;
+    heads.forEach(function (h, i) { if (h.getBoundingClientRect().top <= limit) cur = i; });
+    if (cur === -1 && heads.length) cur = 0;
+    links.forEach(function (l, i) { l.classList.toggle("current", i === cur); });
+  }
+  byId("note-toc-toggle").addEventListener("click", function () {
+    setNoteTocOpen(!byId("note-toc").classList.contains("open"));
+  });
+  byId("note-body").addEventListener("scroll", updateNoteTocCurrent);
+  (function watchNoteHeadings() {
+    var t = null;
+    new MutationObserver(function () {
+      clearTimeout(t); t = setTimeout(renderNoteToc, 150);
+    }).observe(byId("note-body"), { childList: true, subtree: true, characterData: true });
+  })();
+
+  /* ---------- Notion-style block gutter (add + drag-reorder note lines) ---------- */
+  // Wrap any stray top-level text / <br> into a block element so every line is
+  // a draggable, hoverable block. Whitespace-only stragglers are dropped.
+  function normalizeNoteBlocks() {
+    var body = byId("note-body");
+    Array.prototype.slice.call(body.childNodes).forEach(function (n) {
+      if (n.nodeType === 3) { // text node
+        if (n.textContent.trim() === "") { body.removeChild(n); return; }
+        var d = document.createElement("div"); body.insertBefore(d, n); d.appendChild(n);
+      } else if (n.nodeType === 1 && n.tagName === "BR") {
+        var d2 = document.createElement("div"); body.insertBefore(d2, n); d2.appendChild(n);
+      }
+    });
+  }
+
+  (function setupNoteBlockGutter() {
+    var body = byId("note-body");
+    var modal = byId("note-overlay").querySelector(".note-modal");
+    var tools = document.createElement("div");
+    tools.className = "note-block-tools";
+    tools.setAttribute("contenteditable", "false");
+    tools.innerHTML = '<div class="nbt-add" title="Add a line below (Alt-click to add above)">+</div>' +
+                      '<div class="nbt-drag" draggable="true" title="Drag to move this line">⠿</div>';
+    modal.appendChild(tools);
+    var dropLine = document.createElement("div");
+    dropLine.className = "note-drop-line";
+    modal.appendChild(dropLine);
+
+    var hoveredBlock = null, draggedBlock = null, dragging = false;
+
+    function topBlock(target) {
+      if (!target || !body.contains(target)) return null;
+      var el = target;
+      while (el && el.parentNode !== body) el = el.parentNode;
+      return (el && el.nodeType === 1) ? el : null;
+    }
+    function positionTools(block) {
+      if (!block) { tools.classList.remove("show"); return; }
+      hoveredBlock = block;
+      var r = block.getBoundingClientRect();
+      tools.style.top = (r.top - 2) + "px";
+      tools.style.left = (r.left - 50) + "px";
+      tools.classList.add("show");
+    }
+    function placeCaret(el) {
+      el.focus && el.focus();
+      var sel = window.getSelection(); if (!sel) return;
+      var r = document.createRange();
+      r.selectNodeContents(el); r.collapse(true);
+      sel.removeAllRanges(); sel.addRange(r);
+    }
+
+    // Which top-level block sits at this vertical position? Using clientY (not the
+    // event target) means the gutter stays put while the cursor crosses the empty
+    // left margin on its way to the + / drag handle.
+    function blockAtY(y) {
+      var kids = body.children, nearest = null, best = Infinity;
+      for (var i = 0; i < kids.length; i++) {
+        var k = kids[i]; if (k.nodeType !== 1) continue;
+        var r = k.getBoundingClientRect();
+        if (y >= r.top && y <= r.bottom) return k;
+        var d = y < r.top ? r.top - y : y - r.bottom;
+        if (d < best) { best = d; nearest = k; }
+      }
+      return nearest;
+    }
+    body.addEventListener("mousemove", function (e) {
+      if (dragging) return;
+      var b = topBlock(e.target) || blockAtY(e.clientY);
+      if (b) positionTools(b);
+    });
+    body.addEventListener("scroll", function () { if (hoveredBlock && tools.classList.contains("show")) positionTools(hoveredBlock); });
+    // when focus leaves the editor, tidy any stray unwrapped line into a real block
+    body.addEventListener("blur", function () { if (!dragging) normalizeNoteBlocks(); });
+    // hide the gutter when the pointer leaves the editor area (but not when it's over the gutter itself)
+    modal.addEventListener("mousemove", function (e) {
+      if (dragging) return;
+      if (body.contains(e.target) || tools.contains(e.target)) return;
+      tools.classList.remove("show");
+    });
+
+    // + button: add an empty line below the hovered block (Alt-click = above)
+    tools.querySelector(".nbt-add").addEventListener("mousedown", function (e) {
+      e.preventDefault();
+      if (!hoveredBlock) return;
+      var line = document.createElement("div");
+      line.appendChild(document.createElement("br"));
+      if (e.altKey) body.insertBefore(line, hoveredBlock);
+      else body.insertBefore(line, hoveredBlock.nextSibling);
+      placeCaret(line);
+      saveActiveNoteDebounced();
+    });
+
+    // drag handle: reorder blocks
+    var handle = tools.querySelector(".nbt-drag");
+    handle.addEventListener("dragstart", function (e) {
+      if (!hoveredBlock) { e.preventDefault(); return; }
+      dragging = true; draggedBlock = hoveredBlock;
+      draggedBlock.classList.add("nb-dragging");
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", "note-block"); } catch (_) {}
+      try { e.dataTransfer.setDragImage(draggedBlock, 10, 10); } catch (_) {}
+      // Hide the gutter AFTER the drag has started — hiding it synchronously
+      // here makes Chrome cancel the drag, so defer it a tick.
+      setTimeout(function () { if (dragging) tools.classList.remove("show"); }, 0);
+    });
+    handle.addEventListener("dragend", function () {
+      dragging = false;
+      if (draggedBlock) draggedBlock.classList.remove("nb-dragging");
+      draggedBlock = null;
+      dropLine.classList.remove("show");
+    });
+
+    function dropTarget(y) {
+      var kids = body.children;
+      if (!kids.length) return null;
+      for (var i = 0; i < kids.length; i++) {
+        var k = kids[i]; if (k === draggedBlock) continue;
+        var r = k.getBoundingClientRect();
+        if (y < r.top + r.height / 2) return { block: k, before: true };
+      }
+      var last = kids[kids.length - 1];
+      if (last === draggedBlock) return null;
+      return { block: last, before: false };
+    }
+    function showDropLine(t) {
+      if (!t) { dropLine.classList.remove("show"); return; }
+      var r = t.block.getBoundingClientRect();
+      dropLine.style.left = r.left + "px";
+      dropLine.style.width = r.width + "px";
+      dropLine.style.top = (t.before ? r.top - 2 : r.bottom - 1) + "px";
+      dropLine.classList.add("show");
+    }
+    body.addEventListener("dragover", function (e) {
+      if (!dragging) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = "move";
+      showDropLine(dropTarget(e.clientY));
+    });
+    body.addEventListener("drop", function (e) {
+      if (!dragging) return;
+      e.preventDefault();
+      var t = dropTarget(e.clientY);
+      if (t && draggedBlock) {
+        if (t.before) body.insertBefore(draggedBlock, t.block);
+        else body.insertBefore(draggedBlock, t.block.nextSibling);
+      }
+      dropLine.classList.remove("show");
+      if (draggedBlock) draggedBlock.classList.remove("nb-dragging");
+      dragging = false; draggedBlock = null;
+      saveActiveNote();
+    });
+  })();
+
+  // toggling a checklist item persists its state
+  byId("note-body").addEventListener("change", function (e) {
+    if (e.target && e.target.type === "checkbox") {
+      if (e.target.checked) e.target.setAttribute("checked", "checked"); else e.target.removeAttribute("checked");
+      var row = e.target.closest(".todo"); if (row) row.classList.toggle("done", e.target.checked);
+      saveActiveNote();
+    }
+  });
+  /* ---------- Font colour (fixed swatch palette) ---------- */
+  var NOTE_COLORS = [
+    { name: "Default", value: "" },
+    { name: "Red", value: "#ef4444" },
+    { name: "Orange", value: "#f97316" },
+    { name: "Amber", value: "#eab308" },
+    { name: "Green", value: "#16a34a" },
+    { name: "Teal", value: "#0d9488" },
+    { name: "Blue", value: "#2563eb" },
+    { name: "Purple", value: "#7c3aed" },
+    { name: "Pink", value: "#db2777" },
+    { name: "Grey", value: "#6b7280" }
+  ];
+  function buildColorSwatches() {
+    var wrap = document.querySelector("#note-color-pop .ct-swatches");
+    if (!wrap || wrap.childNodes.length) return;
+    NOTE_COLORS.forEach(function (c) {
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "ct-swatch" + (c.value ? "" : " ct-default");
+      b.title = c.name;
+      b.setAttribute("data-color", c.value);
+      if (c.value) b.style.background = c.value; else b.textContent = "A";
+      wrap.appendChild(b);
+    });
+  }
+  function applyNoteColor(color) {
+    var body = byId("note-body"); body.focus();
+    try { document.execCommand("styleWithCSS", false, true); } catch (e) {}
+    // empty value = reset to the note's default text colour
+    var val = color || getComputedStyle(body).color || "#0f1423";
+    document.execCommand("foreColor", false, val);
+    try { document.execCommand("styleWithCSS", false, false); } catch (e) {}
+    var swatch = document.querySelector(".ct-color-a");
+    if (swatch && color) swatch.style.setProperty("--ct-color-current", color);
+    saveActiveNoteDebounced();
+  }
+  function toggleColorPop(force) {
+    var pop = byId("note-color-pop"); if (!pop) return;
+    buildColorSwatches();
+    var show = (typeof force === "boolean") ? force : !pop.classList.contains("show");
+    pop.classList.toggle("show", show);
+  }
+
+  /* ---------- Tables (insert + add/delete rows & columns) ---------- */
+  function insertNoteTable(rows, cols) {
+    rows = rows || 3; cols = cols || 3;
+    var body = byId("note-body"); body.focus();
+    var html = '<table><thead><tr>';
+    for (var c = 0; c < cols; c++) html += '<th>Header ' + (c + 1) + '</th>';
+    html += '</tr></thead><tbody>';
+    for (var r = 0; r < rows - 1; r++) {
+      html += '<tr>';
+      for (var c2 = 0; c2 < cols; c2++) html += '<td><br></td>';
+      html += '</tr>';
+    }
+    html += '</tbody></table><p><br></p>';
+    document.execCommand("insertHTML", false, html);
+    saveActiveNoteDebounced();
+  }
+  function currentCell() {
+    var sel = window.getSelection(); if (!sel || !sel.rangeCount) return null;
+    var node = sel.anchorNode; if (!node) return null;
+    if (node.nodeType === 3) node = node.parentNode;
+    if (!node.closest) return null;
+    var cell = node.closest("td,th");
+    if (cell && byId("note-body").contains(cell)) return cell;
+    return null;
+  }
+  function cellIndex(cell) {
+    var row = cell.parentNode, i = 0;
+    for (var k = 0; k < row.children.length; k++) { if (row.children[k] === cell) return i; i++; }
+    return 0;
+  }
+  function newCellLike(ref) {
+    var td = document.createElement(ref.tagName.toLowerCase() === "th" ? "th" : "td");
+    td.innerHTML = "<br>"; return td;
+  }
+  function insertTableRow(where) {
+    var cell = currentCell(); if (!cell) return;
+    var row = cell.parentNode, table = cell.closest("table");
+    var cols = row.children.length;
+    var newRow = document.createElement("tr");
+    for (var i = 0; i < cols; i++) { var td = document.createElement("td"); td.innerHTML = "<br>"; newRow.appendChild(td); }
+    if (where === "above") row.parentNode.insertBefore(newRow, row);
+    else row.parentNode.insertBefore(newRow, row.nextSibling);
+    saveActiveNoteDebounced();
+  }
+  function insertTableCol(where) {
+    var cell = currentCell(); if (!cell) return;
+    var idx = cellIndex(cell), table = cell.closest("table");
+    Array.prototype.forEach.call(table.rows, function (row) {
+      var ref = row.children[idx] || null;
+      var nc = newCellLike(ref || row.children[0] || cell);
+      if (where === "left") row.insertBefore(nc, ref);
+      else row.insertBefore(nc, ref ? ref.nextSibling : null);
+    });
+    saveActiveNoteDebounced();
+  }
+  function deleteTableRow() {
+    var cell = currentCell(); if (!cell) return;
+    var row = cell.parentNode, table = cell.closest("table");
+    if (table.rows.length <= 1) { table.remove(); }
+    else row.remove();
+    saveActiveNoteDebounced(); updateNoteToolbarState();
+  }
+  function deleteTableCol() {
+    var cell = currentCell(); if (!cell) return;
+    var idx = cellIndex(cell), table = cell.closest("table");
+    if ((table.rows[0] ? table.rows[0].children.length : 0) <= 1) { table.remove(); }
+    else Array.prototype.forEach.call(table.rows, function (row) { if (row.children[idx]) row.children[idx].remove(); });
+    saveActiveNoteDebounced(); updateNoteToolbarState();
+  }
+  function deleteTable() {
+    var cell = currentCell(); if (!cell) return;
+    var table = cell.closest("table"); if (table) table.remove();
+    saveActiveNoteDebounced(); updateNoteToolbarState();
+  }
+
+  function updateNoteToolbarState() {
+    ["bold", "italic", "underline", "insertUnorderedList", "insertOrderedList"].forEach(function (cmd) {
+      var btn = document.querySelector('#note-toolbar .ct-btn[data-cmd="' + cmd + '"]');
+      if (!btn) return; var on = false; try { on = document.queryCommandState(cmd); } catch (err) {}
+      btn.classList.toggle("active", on);
+    });
+    var block = ""; try { block = (document.queryCommandValue("formatBlock") || "").toLowerCase(); } catch (err) {}
+    ["h1", "h2", "h3"].forEach(function (h) {
+      var btn = document.querySelector('#note-toolbar .ct-btn[data-cmd="' + h + '"]');
+      if (btn) btn.classList.toggle("active", block === h);
+    });
+    // show table controls only when the cursor sits inside a table
+    var inTable = !!currentCell();
+    Array.prototype.forEach.call(document.querySelectorAll("#note-toolbar .ct-table-tools"), function (el) {
+      el.style.display = inTable ? "" : "none";
+    });
+  }
+
+  renderNoteList();
+  if (notesData.length) openNote(notesData.slice().sort(function (a, b) { return (b.updated || "").localeCompare(a.updated || ""); })[0].id);
+
+  // helpers
+  function el(tag, cls) { var e = document.createElement(tag); if (cls) e.className = cls; return e; }
+  function byId(i) { return document.getElementById(i); }
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+  function esc(s) { var d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+  function fmtDateTime(iso) { if (!iso) return ""; var d = new Date(iso); return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }); }
+
+  renderEpics();
+  render();
+};
+
+/* =====================================================================
+   CLOUD SYNC + PASSWORDLESS LOGIN (Supabase magic link)
+   The board is locked behind a login. Enter your email, get a login link,
+   click it, and you're in — no password. Only the signed-in account can
+   read or write its data, and it syncs across every device you log in on.
+   ===================================================================== */
+(function () {
+  "use strict";
+
+  var SUPABASE_URL      = "https://ebamjhuteebmtfxvppfs.supabase.co";
+  var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImViYW1qaHV0ZWVibXRmeHZwcGZzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxMDEzMjksImV4cCI6MjA5ODY3NzMyOX0.MWsmZY2ImPVkO7GgsxJWNCLciIA3gxnhAQ2wFbaRtWo";
+  var SITE_URL          = "https://yongtimvenetia-wq.github.io/kanban-board/"; // where the login link returns you
+
+  var SESSION_KEY = "vytzone.session.v1";
+  var CLOUD_KEYS = [
+    "vytzone.tickets.v2",
+    "vytzone.notes.v1",
+    "vytzone.notes.v2",
+    "vytzone.seq.v1",
+    "vytzone.epics.v1"
+  ];
+
+  var CLOUD_ENABLED = SUPABASE_URL.indexOf("PASTE_") === -1 &&
+                      SUPABASE_ANON_KEY.indexOf("PASTE_") === -1;
+
+  // ---- session storage ----
+  function getSession() {
+    try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch (e) { return null; }
+  }
+  function setSession(j) {
+    if (!j || !j.access_token) return null;
+    var sess = {
+      access_token: j.access_token,
+      refresh_token: j.refresh_token,
+      expires_at: Math.floor(Date.now() / 1000) + (j.expires_in || 3600),
+      user_id: j.user && j.user.id,
+      email: j.user && j.user.email
+    };
+    localStorage.setItem(SESSION_KEY, JSON.stringify(sess));
+    return sess;
+  }
+  function clearSession() { localStorage.removeItem(SESSION_KEY); }
+
+  function authHeaders(extra) {
+    var s = getSession();
+    var h = { "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer " + (s ? s.access_token : SUPABASE_ANON_KEY) };
+    if (extra) for (var k in extra) h[k] = extra[k];
+    return h;
+  }
+
+  // ---- auth calls ----
+  function authError(j) {
+    return (j && (j.error_description || j.msg || j.error || j.message)) || "Something went wrong. Please try again.";
+  }
+  // Email a one-time login link (creates the account on first use).
+  function sendMagicLink(email) {
+    return fetch(SUPABASE_URL + "/auth/v1/otp?redirect_to=" + encodeURIComponent(SITE_URL), {
+      method: "POST",
+      headers: { "apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email, create_user: true })
+    }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error(authError(j)); return true; }); });
+  }
+  // Look up the signed-in user (to learn their id) from an access token.
+  function fetchUser(token) {
+    return fetch(SUPABASE_URL + "/auth/v1/user", {
+      headers: { "apikey": SUPABASE_ANON_KEY, "Authorization": "Bearer " + token }
+    }).then(function (r) { return r.ok ? r.json() : null; });
+  }
+  // Read tokens the login link puts in the URL (#access_token=...&refresh_token=...).
+  function sessionFromHash() {
+    if (!location.hash) return null;
+    var p = new URLSearchParams(location.hash.slice(1));
+    var at = p.get("access_token");
+    if (!at) return null;
+    return { access_token: at, refresh_token: p.get("refresh_token"), expires_in: parseInt(p.get("expires_in") || "3600", 10) };
+  }
+  function refreshSession() {
+    var s = getSession();
+    if (!s || !s.refresh_token) return Promise.reject(new Error("no session"));
+    return fetch(SUPABASE_URL + "/auth/v1/token?grant_type=refresh_token", {
+      method: "POST",
+      headers: { "apikey": SUPABASE_ANON_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: s.refresh_token })
+    }).then(function (r) { if (!r.ok) throw new Error("refresh failed"); return r.json(); })
+      .then(function (j) { return setSession(j); });
+  }
+  function ensureFresh() {
+    var s = getSession();
+    if (!s) return Promise.reject(new Error("no session"));
+    if (s.expires_at && (s.expires_at - 60) > Math.floor(Date.now() / 1000)) return Promise.resolve(s);
+    return refreshSession();
+  }
+
+  // ---- data sync (owner-scoped) ----
+  function cloudFetch() {
+    var s = getSession();
+    if (!s) return Promise.resolve(null);
+    var url = SUPABASE_URL + "/rest/v1/kanban_state?user_id=eq." +
+              encodeURIComponent(s.user_id) + "&select=data,updated_at";
+    function go() { return fetch(url, { headers: authHeaders() }); }
+    return go().then(function (r) { return r.status === 401 ? refreshSession().then(go) : r; })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (rows) { return (rows && rows[0]) ? rows[0] : null; });
+  }
+  function cloudPush() {
+    var s = getSession();
+    if (!CLOUD_ENABLED || !s) return Promise.resolve();
+    var data = {};
+    CLOUD_KEYS.forEach(function (k) { var v = localStorage.getItem(k); if (v != null) data[k] = v; });
+    var stamp = new Date().toISOString();
+    var body = JSON.stringify({ id: s.user_id, user_id: s.user_id, data: data, updated_at: stamp });
+    function go() {
+      return fetch(SUPABASE_URL + "/rest/v1/kanban_state", {
+        method: "POST",
+        headers: authHeaders({ "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates,return=minimal" }),
+        body: body
+      });
+    }
+    return go().then(function (r) { return r.status === 401 ? refreshSession().then(go) : r; })
+      .then(function () { window.__lastCloudStamp = stamp; });
+  }
+
+  var pushTimer = null;
+  window.cloudSchedulePush = function () {
+    if (!CLOUD_ENABLED || !getSession()) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(function () { cloudPush(); }, 700);
+  };
+
+  function applyCloud(row) {
+    if (!row || !row.data) return false;
+    Object.keys(row.data).forEach(function (k) {
+      var val = row.data[k];
+      localStorage.setItem(k, typeof val === "string" ? val : JSON.stringify(val));
+    });
+    window.__lastCloudStamp = row.updated_at;
+    return true;
+  }
+
+  // ---- login screen ----
+  function showLogin(onSuccess) {
+    var wrap = document.createElement("div");
+    wrap.setAttribute("style",
+      "position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;" +
+      "background:#0f1115;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;");
+    wrap.innerHTML =
+      "<div style=\"width:340px;max-width:90vw;background:#1a1d24;border:1px solid #2a2f3a;border-radius:14px;padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.5);\">" +
+        "<div style=\"font-size:20px;font-weight:700;color:#fff;margin-bottom:4px;\">VYT's Zone</div>" +
+        "<div style=\"font-size:13px;color:#8b93a7;margin-bottom:20px;\">Enter your email and we'll send you a login link.</div>" +
+        "<input id=\"vyt-email\" type=\"email\" placeholder=\"you@example.com\" autocomplete=\"email\" style=\"width:100%;box-sizing:border-box;padding:11px 12px;margin-bottom:12px;background:#0f1115;border:1px solid #2a2f3a;border-radius:8px;color:#fff;font-size:14px;\">" +
+        "<div id=\"vyt-msg\" style=\"font-size:12.5px;color:#ff6b6b;min-height:17px;margin-bottom:10px;\"></div>" +
+        "<button id=\"vyt-send\" style=\"width:100%;padding:11px;background:#7c3aed;border:0;border-radius:8px;color:#fff;font-size:14px;font-weight:600;cursor:pointer;\">Email me a login link</button>" +
+      "</div>";
+    document.body.appendChild(wrap);
+
+    var emailEl = wrap.querySelector("#vyt-email");
+    var msgEl   = wrap.querySelector("#vyt-msg");
+    var sendBtn = wrap.querySelector("#vyt-send");
+    emailEl.focus();
+
+    function fail(e) { msgEl.style.color = "#ff6b6b"; msgEl.textContent = (e && e.message) || String(e); sendBtn.disabled = false; }
+    function sent() {
+      msgEl.style.color = "#4ade80";
+      msgEl.textContent = "Check your email for a login link, then open it on this device.";
+      sendBtn.textContent = "Link sent";
+    }
+    function attempt() {
+      var email = emailEl.value.trim();
+      if (!email) { fail(new Error("Enter your email.")); return; }
+      sendBtn.disabled = true; msgEl.style.color = "#8b93a7"; msgEl.textContent = "Sending…";
+      sendMagicLink(email).then(sent).catch(fail);
+    }
+    sendBtn.addEventListener("click", attempt);
+    emailEl.addEventListener("keydown", function (e) { if (e.key === "Enter") attempt(); });
+    // onSuccess is used after the login link returns and a session is established.
+    void onSuccess;
+  }
+
+  function addLogoutButton() {
+    if (document.getElementById("vyt-logout")) return;
+    var b = document.createElement("button");
+    b.id = "vyt-logout";
+    b.textContent = "Log out";
+    b.setAttribute("style",
+      "position:fixed;bottom:12px;left:12px;z-index:9998;padding:6px 12px;font-size:12px;" +
+      "background:rgba(20,22,28,.85);color:#c3c9d6;border:1px solid #2a2f3a;border-radius:8px;cursor:pointer;");
+    b.addEventListener("click", function () {
+      clearSession();
+      CLOUD_KEYS.forEach(function (k) { localStorage.removeItem(k); }); // don't leave data on this device
+      location.reload();
+    });
+    document.body.appendChild(b);
+  }
+
+  // Compare timestamps by their actual instant, not their text form. The cloud
+  // returns timestamps in a slightly different string format than the one we
+  // send, so a raw string compare treats our own writes as "someone else changed
+  // it" and reloads — wiping in-progress edits and resetting the tab.
+  function stampMs(x) { if (!x) return 0; var t = new Date(x).getTime(); return isNaN(t) ? 0 : t; }
+
+  // True while the user is actively typing/editing, so we never reload from under them.
+  function isEditingNow() {
+    var a = document.activeElement;
+    if (a && (a.isContentEditable || a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.tagName === "SELECT")) return true;
+    var openOverlay = document.querySelector(".overlay.show, .overlay.open");
+    if (openOverlay) return true;
+    return false;
+  }
+
+  // Re-sync when the tab regains focus, so edits made on another device show up.
+  window.addEventListener("focus", function () {
+    if (!CLOUD_ENABLED || !getSession()) return;
+    // Don't disturb an active edit, and don't reload while our own push is still pending.
+    if (isEditingNow() || pushTimer) return;
+    cloudFetch().then(function (row) {
+      if (!row || !row.updated_at) return;
+      // Only reload for a genuinely newer remote change. The 2s slack absorbs
+      // formatting/rounding differences so our own recent write never counts.
+      if (stampMs(row.updated_at) > stampMs(window.__lastCloudStamp) + 2000) location.reload();
+    }).catch(function () {});
+  });
+
+  function startBoard() {
+    cloudFetch().then(function (row) {
+      applyCloud(row);          // if null, board just starts from local
+      window.__bootKanban();
+      if (!row) cloudPush();    // first time for this account — seed the cloud
+      addLogoutButton();
+    }).catch(function () {
+      window.__bootKanban();
+      addLogoutButton();
+    });
+  }
+
+  // ---- boot ----
+  // Local preview bypass: when the file is opened directly (file://) or served
+  // from localhost, skip the email login and run the board straight from this
+  // device's storage. The published https:// site is unaffected and still
+  // requires login + cloud sync.
+  var IS_LOCAL_PREVIEW = location.protocol === "file:" ||
+                         /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+  if (!CLOUD_ENABLED || IS_LOCAL_PREVIEW) { window.__bootKanban(); return; }
+  var hs = sessionFromHash();
+  if (hs) {
+    // Returned from clicking the login link — finish signing in.
+    fetchUser(hs.access_token).then(function (u) {
+      setSession({ access_token: hs.access_token, refresh_token: hs.refresh_token, expires_in: hs.expires_in, user: u });
+      history.replaceState(null, "", location.pathname + location.search);
+      startBoard();
+    }).catch(function () {
+      history.replaceState(null, "", location.pathname + location.search);
+      showLogin(startBoard);
+    });
+  } else {
+    ensureFresh().then(function () { startBoard(); })
+                 .catch(function () { showLogin(startBoard); });
+  }
+})();
+</script>
+</body>
+</html>
