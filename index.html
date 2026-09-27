@@ -515,6 +515,40 @@
   .note-drop-line.show { display: block; }
   .nb-dragging { opacity: .4; }
 
+  /* ---------- Note table of contents (left sidebar) ---------- */
+  .note-modal.toc-open { max-width: 1040px; }
+  .note-layout { display: flex; gap: 12px; align-items: stretch; }
+  .note-main-col { flex: 1; min-width: 0; }
+  .note-toc { flex: 0 0 36px; display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); overflow: hidden; transition: flex-basis .18s ease; }
+  .note-toc.open { flex-basis: 210px; }
+  .note-toc-head { display: flex; align-items: center; gap: 6px; padding: 5px; border-bottom: 1px solid transparent; }
+  .note-toc.open .note-toc-head { border-bottom-color: var(--border); padding: 5px 5px 5px 10px; }
+  .note-toc-title { display: none; flex: 1; font-size: 13px; font-weight: 700; color: var(--text); }
+  .note-toc.open .note-toc-title { display: block; }
+  .note-toc-toggle { flex: 0 0 auto; width: 26px; height: 26px; border: 1px solid transparent; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; display: flex; align-items: center; justify-content: center; position: relative; padding: 0; }
+  .note-toc-toggle:hover { background: var(--panel); border-color: var(--border); color: var(--accent); }
+  .note-toc-toggle:focus-visible, .note-toc-link:focus-visible { outline: 2px solid rgba(99,102,241,.45); outline-offset: 1px; }
+  .note-toc-count { position: absolute; top: -4px; right: -5px; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: var(--accent); color: #fff; font-size: 9px; font-weight: 700; line-height: 15px; text-align: center; }
+  .note-toc.open .note-toc-count, .note-toc-count:empty { display: none; }
+  .note-toc-list { display: none; list-style: none; margin: 0; padding: 6px; overflow-y: auto; max-height: calc(100vh - 360px); }
+  .note-toc.open .note-toc-list { display: block; }
+  .note-toc-link { display: block; width: 100%; text-align: left; border: none; background: none; font-family: inherit; font-size: 13px; line-height: 1.35; color: var(--text); padding: 5px 8px; border-radius: 6px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-left: 2px solid transparent; }
+  .note-toc-link:hover { background: #eef0fe; color: var(--accent); }
+  .note-toc-link.current { border-left-color: var(--accent); color: var(--accent); background: #eef0fe; }
+  .note-toc-link.lvl-1 { font-weight: 700; }
+  .note-toc-link.lvl-2 { padding-left: 20px; }
+  .note-toc-link.lvl-3 { padding-left: 32px; color: var(--muted); font-size: 12px; }
+  .note-toc-link.lvl-3:hover, .note-toc-link.lvl-3.current { color: var(--accent); }
+  .note-toc-empty { font-size: 12px; color: var(--muted); padding: 8px; line-height: 1.45; }
+  .note-body .toc-flash { background: rgba(99,102,241,.12); border-radius: 4px; transition: background 1s ease; }
+  @media (max-width: 700px) {
+    .note-layout { flex-direction: column; }
+    .note-toc, .note-toc.open { flex-basis: auto; }
+    .note-toc-list { max-height: 200px; }
+    .note-toc-title { display: block; }
+  }
+  @media (prefers-reduced-motion: reduce) { .note-toc { transition: none; } .note-body .toc-flash { transition: none; } }
+
   @media (max-width: 900px) {
     .notes-app { flex-direction: column; }
     .notes-sidebar { flex: none; width: 100%; max-height: 260px; }
@@ -596,6 +630,18 @@
             <button class="btn ghost" id="note-to-ticket" title="Create a board ticket from this note">↗ Create ticket</button>
             <button class="btn danger" id="note-delete" title="Delete note">Delete</button>
           </div>
+          <div class="note-layout">
+          <aside class="note-toc" id="note-toc" aria-label="Table of contents">
+            <div class="note-toc-head">
+              <button type="button" class="note-toc-toggle" id="note-toc-toggle" aria-expanded="false" aria-controls="note-toc-list" title="Show table of contents">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16"/><path d="M8 12h12"/><path d="M12 18h8"/></svg>
+                <span class="note-toc-count" id="note-toc-count"></span>
+              </button>
+              <span class="note-toc-title">Contents</span>
+            </div>
+            <ul class="note-toc-list" id="note-toc-list"></ul>
+          </aside>
+          <div class="note-main-col">
           <div class="comment-toolbar" id="note-toolbar">
             <button type="button" class="ct-btn" data-cmd="h1" title="Heading 1">H1</button>
             <button type="button" class="ct-btn" data-cmd="h2" title="Heading 2">H2</button>
@@ -632,6 +678,8 @@
           </div>
           <div id="note-body" class="note-body" contenteditable="true" data-placeholder="Start writing… use the toolbar to add lists, checkboxes and links."></div>
           <div class="note-meta" id="note-meta"></div>
+          </div>
+          </div>
         </div>
     <div class="modal-actions">
       <button class="btn ghost" id="note-close">Close</button>
@@ -2159,6 +2207,8 @@ window.__bootKanban = function () {
     setNoteMeta(n, false);
     byId("note-overlay").classList.add("open");
     autosizeSubject(); // measure after the modal is visible
+    setNoteTocOpen(false); // table of contents starts collapsed
+    renderNoteToc();
     renderNoteList();
   }
   function closeNote() {
@@ -2677,6 +2727,82 @@ window.__bootKanban = function () {
     updateNoteToolbarState();
   });
   ["keyup", "mouseup", "focus"].forEach(function (ev) { byId("note-body").addEventListener(ev, updateNoteToolbarState); });
+
+  /* ---------- Note table of contents ---------- */
+  function setNoteTocOpen(open) {
+    var toc = byId("note-toc"), btn = byId("note-toc-toggle");
+    toc.classList.toggle("open", open);
+    byId("note-overlay").querySelector(".note-modal").classList.toggle("toc-open", open);
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+    btn.title = open ? "Hide table of contents" : "Show table of contents";
+  }
+  function noteHeadings() {
+    return Array.prototype.filter.call(byId("note-body").querySelectorAll("h1, h2, h3"), function (h) {
+      return h.textContent.trim() !== "";
+    });
+  }
+  function renderNoteToc() {
+    var list = byId("note-toc-list"), heads = noteHeadings();
+    list.innerHTML = "";
+    byId("note-toc-count").textContent = heads.length ? String(heads.length) : "";
+    if (!heads.length) {
+      var empty = document.createElement("li");
+      empty.className = "note-toc-empty";
+      empty.textContent = "No headings yet. Use H1, H2 or H3 in the toolbar and they'll show up here.";
+      list.appendChild(empty);
+      return;
+    }
+    // Indent relative to the biggest heading used, so a note with only H2/H3 still starts at the left edge
+    var top = Math.min.apply(null, heads.map(function (h) { return +h.tagName.charAt(1); }));
+    heads.forEach(function (h, i) {
+      var li = document.createElement("li");
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "note-toc-link lvl-" + (+h.tagName.charAt(1) - top + 1);
+      b.textContent = h.textContent.trim();
+      b.title = b.textContent;
+      b.addEventListener("click", function () { jumpToNoteHeading(i); });
+      li.appendChild(b); list.appendChild(li);
+    });
+    updateNoteTocCurrent();
+  }
+  function jumpToNoteHeading(i) {
+    var body = byId("note-body"), h = noteHeadings()[i]; if (!h) return;
+    var smooth = !(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+    // Put the cursor at the start of the heading first (so it doesn't fight the scroll)
+    try {
+      body.focus({ preventScroll: true });
+      var range = document.createRange(); range.selectNodeContents(h); range.collapse(true);
+      var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+    } catch (e) {}
+    // Then scroll the note so the heading sits at the top
+    var y = body.scrollTop + h.getBoundingClientRect().top - body.getBoundingClientRect().top - 8;
+    body.scrollTo({ top: y, behavior: smooth ? "smooth" : "auto" });
+    // If the whole window is scrolled so the note is off-screen, bring it into view too
+    var br = body.getBoundingClientRect();
+    if (br.top < 0 || br.top > window.innerHeight - 80) body.scrollIntoView({ block: "start", behavior: smooth ? "smooth" : "auto" });
+    // Briefly highlight the heading
+    h.classList.add("toc-flash");
+    setTimeout(function () { h.classList.remove("toc-flash"); if (!h.className) h.removeAttribute("class"); }, 900);
+  }
+  function updateNoteTocCurrent() {
+    var body = byId("note-body"), heads = noteHeadings();
+    var links = byId("note-toc-list").querySelectorAll(".note-toc-link");
+    var limit = body.getBoundingClientRect().top + 40, cur = -1;
+    heads.forEach(function (h, i) { if (h.getBoundingClientRect().top <= limit) cur = i; });
+    if (cur === -1 && heads.length) cur = 0;
+    links.forEach(function (l, i) { l.classList.toggle("current", i === cur); });
+  }
+  byId("note-toc-toggle").addEventListener("click", function () {
+    setNoteTocOpen(!byId("note-toc").classList.contains("open"));
+  });
+  byId("note-body").addEventListener("scroll", updateNoteTocCurrent);
+  (function watchNoteHeadings() {
+    var t = null;
+    new MutationObserver(function () {
+      clearTimeout(t); t = setTimeout(renderNoteToc, 150);
+    }).observe(byId("note-body"), { childList: true, subtree: true, characterData: true });
+  })();
 
   /* ---------- Notion-style block gutter (add + drag-reorder note lines) ---------- */
   // Wrap any stray top-level text / <br> into a block element so every line is
@@ -3249,6 +3375,5 @@ window.__bootKanban = function () {
   }
 })();
 </script>
-<script src="board-sync.js?v=3"></script>
 </body>
 </html>
